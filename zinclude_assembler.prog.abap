@@ -33,7 +33,7 @@ report zinclude_assembler.
 **********************************************************************
 * EXCEPTIONS
 **********************************************************************
-class lcx_error definition inheriting from cx_static_check.
+class lcx_error definition inheriting from cx_static_check final.
 endclass.
 
 **********************************************************************
@@ -141,7 +141,7 @@ endclass.
 * TEST  - CODE EXTRACTOR
 ***
 
-class lcl_extractor_test definition inheriting from cl_aunit_assert
+class lcl_extractor_test definition inheriting from cl_aunit_assert final
   for testing duration short risk level harmless.
 
   private section.
@@ -159,7 +159,7 @@ class lcl_extractor_test implementation.
 
     try.
       clear sy-subrc.
-      lt_code = lo_if->get_prog_code( i_progname   = '~~DOES~NOT~EXISTS~~' ).
+      lt_code = lo_if->get_prog_code( i_progname   = '~~DOES~NOT~EXIST~~' ).
     catch lcx_error.
       sy-subrc = 1.
     endtry.
@@ -201,39 +201,39 @@ class lcl_dummy_extractor implementation.
 
     case i_progname.
       when 'XTESTPROG'.
-        append_codeline 'report xtestprog.'.
-        append_codeline 'include xtestprog_top.'.
-        append_codeline 'include xtestprog_f01.'.
-        append_codeline 'include xtestprog_ext.'.
-        append_codeline 'start-of-selection.'.
-        append_codeline '  perform perform_write.'.
+        append_codeline 'report xtestprog.'.          "#EC NOTEXT
+        append_codeline 'include xtestprog_top.'.     "#EC NOTEXT
+        append_codeline 'include xtestprog_f01.'.     "#EC NOTEXT
+        append_codeline 'include xtestprog_ext.'.     "#EC NOTEXT
+        append_codeline 'start-of-selection.'.        "#EC NOTEXT
+        append_codeline '  perform perform_write.'.   "#EC NOTEXT
       when 'XTESTPROG_TOP'.
-        append_codeline 'include xtestprog_doc.'.
-        append_codeline 'constants gstr type string value ''The test string''.'.
+        append_codeline 'include xtestprog_doc.'.     "#EC NOTEXT
+        append_codeline 'constants gstr type string value ''The test string''.'. "#EC NOTEXT
       when 'XTESTPROG_F01'.
-        append_codeline 'form perform_write.'.
-        append_codeline '  write / gstr.'.
-        append_codeline 'endform.'.
+        append_codeline 'form perform_write.'.        "#EC NOTEXT
+        append_codeline '  write / gstr.'.            "#EC NOTEXT
+        append_codeline 'endform.'.                   "#EC NOTEXT
       when 'XTESTPROG_DOC'.
-        append_codeline '*Just some documentation here'.
+        append_codeline '*Just some documentation here'.  "#EC NOTEXT
       when 'XTESTPROG_EXT'.
-        append_codeline '*Include from another package'.
+        append_codeline '*Include from another package'.  "#EC NOTEXT
       when 'ASSEMBLED_RESULT'. " For testing
-        append_codeline 'report xtestprog.'.
-        append_codeline '*include xtestprog_top.'.
-        append_codeline '*include xtestprog_doc.'.
-        append_codeline '*Just some documentation here'.
-        append_codeline ''.
-        append_codeline 'constants gstr type string value ''The test string''.'.
-        append_codeline ''.
-        append_codeline '*include xtestprog_f01.'.
-        append_codeline 'form perform_write.'.
-        append_codeline '  write / gstr.'.
-        append_codeline 'endform.'.
-        append_codeline ''.
-        append_codeline 'include xtestprog_ext.'.
-        append_codeline 'start-of-selection.'.
-        append_codeline '  perform perform_write.'.
+        append_codeline 'report xtestprog.'.              "#EC NOTEXT
+        append_codeline '*include xtestprog_top.'.        "#EC NOTEXT
+        append_codeline '*include xtestprog_doc.'.        "#EC NOTEXT
+        append_codeline '*Just some documentation here'.  "#EC NOTEXT
+        append_codeline '"'.
+        append_codeline 'constants gstr type string value ''The test string''.'. "#EC NOTEXT
+        append_codeline '"'.
+        append_codeline '*include xtestprog_f01.'.        "#EC NOTEXT
+        append_codeline 'form perform_write.'.            "#EC NOTEXT
+        append_codeline '  write / gstr.'.                "#EC NOTEXT
+        append_codeline 'endform.'.                       "#EC NOTEXT
+        append_codeline '"'.
+        append_codeline 'include xtestprog_ext.'.         "#EC NOTEXT
+        append_codeline 'start-of-selection.'.            "#EC NOTEXT
+        append_codeline '  perform perform_write.'.       "#EC NOTEXT
     endcase.
 
     r_codetab = lt_code.
@@ -356,7 +356,7 @@ endclass.
 * TEST - CODE OBJECT
 ***
 
-class lcl_code_object_test definition inheriting from cl_aunit_assert
+class lcl_code_object_test definition inheriting from cl_aunit_assert final
   for testing duration short risk level harmless.
 
   private section.
@@ -505,10 +505,11 @@ class lcl_assembler implementation.
   endmethod.
 
   method pad_line.
+    constants c_code_width type i value 70.
     data cnt type i.
     data tmp type text80.
 
-    cnt = 72 - strlen( i_str ) - 2.
+    cnt = c_code_width - strlen( i_str ).
     if cnt < 0.
       cnt = 0.
     endif.
@@ -526,7 +527,7 @@ endclass.
 * TEST - ASSEMBLER
 ***
 
-class lcl_assembler_test definition inheriting from cl_aunit_assert
+class lcl_assembler_test definition inheriting from cl_aunit_assert final
   for testing duration short risk level harmless.
 
   private section.
@@ -577,7 +578,7 @@ endclass.
 class lcl_main implementation.
   method run.
 
-    write: / 'Assembling program:', i_progname.
+    write: / 'Assembling program:', i_progname. "#EC NOTEXT
 
     data lo_accessor type ref to lcl_extractor.
     data lo_progcode type ref to lcl_code_object.
@@ -586,14 +587,14 @@ class lcl_main implementation.
     try.
       lo_progcode = lcl_code_object=>load( io_accessor = lo_accessor i_progname = i_progname ).
     catch lcx_error.
-      write: / 'ERROR: could not read the program'.
+      write: / 'ERROR: could not read the program'. "#EC NOTEXT
       return.
     endtry.
 
     data ls_include type lcl_code_object=>ty_include.
 
     loop at lo_progcode->at_includes into ls_include.
-      write: / '  include found:', ls_include-obj->a_name, '@line', ls_include-lnum,
+      write: / '  include found:', ls_include-obj->a_name, '@line', ls_include-lnum, "#EC NOTEXT
                'DEVC =', ls_include-obj->a_devclass.
     endloop.
 
@@ -649,10 +650,10 @@ initialization.
 **********************************************************************
 start-of-selection.
 
-  data gt_objects type standard table of ko100.
-  call function 'TR_OBJECT_TABLE'
-    tables wt_object_text = gt_objects
-    exceptions others     = 1.
+*  data gt_objects type standard table of ko100.
+*  call function 'TR_OBJECT_TABLE'
+*    tables wt_object_text = gt_objects
+*    exceptions others     = 1.
 
   lcl_main=>run(
       i_progname        = p_prog
