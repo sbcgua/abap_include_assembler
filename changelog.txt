@@ -1,0 +1,13 @@
+ABAP Include Assembler changelog
+================================
+
+Legend
+------
+* : fixed
+! : changed
++ : added
+- : removed
+
+v0.0.1, 2016-03-20
+------------------
+Initial release. It works even ;)
