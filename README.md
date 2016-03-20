@@ -28,7 +28,7 @@ Currently is in very **early dev stange but works**. In particular, convenient d
 
 Internal structure is designed so that it can be **integrated in another software as a middleware**.
 
-Briefly, you call `lcl_code_object=>load()` with a program name to assemble. This creates a memory copy of program code with all includes as a deep list. Then you create `lcl_assembler` instance with a reference to the above code object and call `assemble()` - it returns `abaptxt255` table with the assembled code. 
+Briefly, you call `lcl_code_object=>load()` with a program name to assemble. This creates a memory copy of program code with all includes as a deep list. Then you create `lcl_assembler` instance with a reference to the above code object and call `assemble()` - it returns `abaptxt255` table with the assembled code. See `lcl_main-run()` for code example.
 
 Integration aspect: `lcl_code_object=>load()` also requires an instance of `lif_devobj_accessor` - an interface implementation that supplies program code by it's name. In the existing program it is implemented in `lcl_extractor` class - it actually reads program code from system. But you are free to implement your own class with another logic. Example can be seen in `lcl_dummy_extractor` - the dummy class used for testing, it doesn't read objects from system but generates them.
 
