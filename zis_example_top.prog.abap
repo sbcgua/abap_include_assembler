@@ -1,0 +1,1 @@
+constants gstr type string value 'The test string'.
