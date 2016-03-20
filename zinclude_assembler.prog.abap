@@ -34,6 +34,27 @@ report zinclude_assembler.
 * EXCEPTIONS
 **********************************************************************
 class lcx_error definition inheriting from cx_static_check final.
+  public section.
+    data msg type string.
+    class-methods raise importing i_msg type string optional raising lcx_error.
+endclass.
+
+class lcx_error implementation.
+  method raise.
+    data sys_call    type sys_calls.
+    data sys_stack   type sys_callst.
+    data ex          type ref to lcx_error.
+
+    call function 'SYSTEM_CALLSTACK'
+      exporting max_level    = 2
+      importing et_callstack = sys_stack.
+
+    read table sys_stack into sys_call index 2.
+
+    create object ex.
+    ex->msg = sys_call-eventname && `(): ` && i_msg.
+    raise exception ex.
+  endmethod.
 endclass.
 
 **********************************************************************
@@ -71,7 +92,7 @@ class lcl_extractor implementation.
       exceptions others     = 1.
 
     if sy-subrc <> 0 or l_status <> 'X'. " Exist and active
-      raise exception type lcx_error.
+      lcx_error=>raise( |check_exist { i_progname }| ).
     endif.
 
     data ls_tadir type tadir.
@@ -82,7 +103,7 @@ class lcl_extractor implementation.
       and   obj_name = i_progname.
 
     if sy-subrc <> 0.
-      raise exception type lcx_error.
+      lcx_error=>raise( |select tadir { i_progname }| ).
     endif.
 
     data lt_e071 type standard table of e071.
@@ -95,13 +116,13 @@ class lcl_extractor implementation.
       exceptions others  = 1.
 
     if sy-subrc <> 0.
-      raise exception type lcx_error.
+      lcx_error=>raise( |sumo_resolve { i_progname }| ).
     endif.
 
     read table lt_e071 into ls_e071 with key object = 'REPS'.
 
     if sy-subrc <> 0.
-      raise exception type lcx_error.
+      lcx_error=>raise( |no REPS object { i_progname }| ).
     endif.
 
     data l_obj type svrs2_versionable_object.
@@ -114,7 +135,7 @@ class lcl_extractor implementation.
       exceptions others = 1.
 
     if sy-subrc <> 0.
-      raise exception type lcx_error.
+      lcx_error=>raise( |svrs_get_version... { i_progname }| ).
     endif.
 
     r_codetab = l_obj-reps-abaptext.
@@ -130,7 +151,7 @@ class lcl_extractor implementation.
       and   obj_name = i_progname.
 
     if sy-subrc <> 0.
-      raise exception type lcx_error.
+      lcx_error=>raise( |select devclass { i_progname }| ).
     endif.
 
   endmethod. "lif_devobj_accessor~get_prog_devc
@@ -208,12 +229,15 @@ class lcl_dummy_extractor implementation.
         append_codeline 'start-of-selection.'.        "#EC NOTEXT
         append_codeline '  perform perform_write.'.   "#EC NOTEXT
       when 'XTESTPROG_TOP'.
-        append_codeline 'include xtestprog_doc.'.     "#EC NOTEXT
-        append_codeline 'constants gstr type string value ''The test string''.'. "#EC NOTEXT
+        append_codeline 'include xtestprog_doc.'.              "#EC NOTEXT
+        append_codeline 'constants gstr type char4 value ''Test''.'. "#EC NOTEXT
+        append_codeline 'types: begin of t_sometype.'.         "#EC NOTEXT
+        append_codeline '        include structure textpool.'. "#EC NOTEXT
+        append_codeline 'types: end of t_sometype.'.           "#EC NOTEXT
       when 'XTESTPROG_F01'.
-        append_codeline 'form perform_write.'.        "#EC NOTEXT
-        append_codeline '  write / gstr.'.            "#EC NOTEXT
-        append_codeline 'endform.'.                   "#EC NOTEXT
+        append_codeline 'form perform_write.'.            "#EC NOTEXT
+        append_codeline '  write / gstr.'.                "#EC NOTEXT
+        append_codeline 'endform.'.                       "#EC NOTEXT
       when 'XTESTPROG_DOC'.
         append_codeline '*Just some documentation here'.  "#EC NOTEXT
       when 'XTESTPROG_EXT'.
@@ -224,7 +248,10 @@ class lcl_dummy_extractor implementation.
         append_codeline '*include xtestprog_doc.'.        "#EC NOTEXT
         append_codeline '*Just some documentation here'.  "#EC NOTEXT
         append_codeline '"'.
-        append_codeline 'constants gstr type string value ''The test string''.'. "#EC NOTEXT
+        append_codeline 'constants gstr type char4 value ''Test''.'. "#EC NOTEXT
+        append_codeline 'types: begin of t_sometype.'.         "#EC NOTEXT
+        append_codeline '        include structure textpool.'. "#EC NOTEXT
+        append_codeline 'types: end of t_sometype.'.           "#EC NOTEXT
         append_codeline '"'.
         append_codeline '*include xtestprog_f01.'.        "#EC NOTEXT
         append_codeline 'form perform_write.'.            "#EC NOTEXT
@@ -234,6 +261,8 @@ class lcl_dummy_extractor implementation.
         append_codeline 'include xtestprog_ext.'.         "#EC NOTEXT
         append_codeline 'start-of-selection.'.            "#EC NOTEXT
         append_codeline '  perform perform_write.'.       "#EC NOTEXT
+      when others.
+        lcx_error=>raise( |test get { i_progname }| ).
     endcase.
 
     r_codetab = lt_code.
@@ -264,7 +293,6 @@ endclass.
 **********************************************************************
 
 class lcl_code_object definition create private final.
-
   public section.
     types:  begin of ty_include,
               lnum  type i,
@@ -280,15 +308,25 @@ class lcl_code_object definition create private final.
                                  i_progname  type sobj_name
                        returning value(ro_obj) type ref to lcl_code_object
                        raising lcx_error.
+endclass.
 
-    class-methods match_include importing i_abapline       type abaptxt255-line
-                                returning value(r_include) type sobj_name.
+class lcl_include_matcher definition final.
+  " I hope I'm not going to far with this parsing thing ... to reconsider RS_GET_ALL_INCLUDES, see #1
+  public section.
+    methods match_include importing i_abapline       type abaptxt255-line
+                          returning value(r_include) type sobj_name.
+  private section.
+    data a_codeline        type string.
+    data a_lines_collected type i.
 
+    methods collect_line importing i_abapline   type abaptxt255-line.
+    methods do_match returning value(r_include) type sobj_name.
 endclass.
 
 class lcl_code_object implementation.
   method load.
     data lo         type ref to lcl_code_object.
+    data lo_ex      type ref to lcx_error.
     data l_line     type abaptxt255.
     data l_incname  type sobj_name.
     data ls_include type ty_include.
@@ -298,13 +336,21 @@ class lcl_code_object implementation.
     lo->a_devclass = io_accessor->get_prog_devc( i_progname = i_progname ).
     lo->a_name     = i_progname.
 
+    data lo_matcher type ref to lcl_include_matcher.
+    create object lo_matcher.
+
     loop at lo->at_codetab into l_line.
       clear l_incname.
       ls_include-lnum = sy-tabix.
-      l_incname       = match_include( l_line-line ).
+      l_incname       = lo_matcher->match_include( l_line-line ).
 
       if l_incname is not initial.
-        ls_include-obj  = load( io_accessor = io_accessor i_progname = l_incname ).
+        try.
+          ls_include-obj  = load( io_accessor = io_accessor i_progname = l_incname ).
+        catch lcx_error into lo_ex.
+          lo_ex->msg = lo_ex->msg && `; ` && i_progname && '@' && |{ ls_include-lnum }|.
+          raise exception lo_ex.
+        endtry.
         append ls_include to lo->at_includes.
       endif.
     endloop.
@@ -313,44 +359,88 @@ class lcl_code_object implementation.
 
   endmethod.
 
+endclass.
+
+class lcl_include_matcher implementation.
   method match_include.
+    data l_cnt type i.
+
+    collect_line( i_abapline ).
+    find first occurrence of '.' in me->a_codeline match count l_cnt.
+    " multi-operations per line not supported
+
+    if l_cnt = 1. " check if line complete
+      r_include = do_match( ).
+      clear me->a_codeline.
+      clear me->a_lines_collected.
+    endif.
+  endmethod.
+
+  method collect_line.
     data l_str type text255.
+    data l_cnt type i.
+    data l_off type i.
 
     l_str = i_abapline.
+    add 1 to me->a_lines_collected.
 
     if l_str+0(1) = '*'. " Ignore comments
       return.
     endif.
 
-    shift     l_str left deleting leading space.
-    translate l_str to upper case.
-
-    if l_str+0(7) <> 'INCLUDE'.
-      return.
-    endif.
-
-    shift l_str left by 7 places.
     shift l_str left deleting leading space.
 
-    data l_offs type i. " Find end of statement
-    data l_cnt  type i.
-    find first occurrence of '.' in l_str match offset l_offs match count l_cnt.
+    find first occurrence of '"' in l_str match offset l_off match count l_cnt.
+    if l_cnt = 1.
+      if l_off = 0.
+        return.
+      else.
+        l_str = l_str+0(l_off).
+      endif.
+    endif.
 
-    if l_cnt <> 1. " BTW 2 statements in the line not supported
+    if l_str is initial.
       return.
     endif.
 
-    l_str = l_str+0(l_offs).
-
-    if l_str ca '"'. " Ignore is comment is in the middle
-      return.
+    if me->a_codeline is not initial.
+      me->a_codeline = me->a_codeline && ` `.
     endif.
 
-    r_include = l_str.
+    me->a_codeline = me->a_codeline && l_str.
 
   endmethod.
 
+  method do_match.
+    translate me->a_codeline to upper case.
+
+    data l_cnt      type i.
+    data result_tab type match_result_tab.
+    data l_result   type match_result.
+
+    find first occurrence of regex '^INCLUDE\s+(\w+)\s*\.' in me->a_codeline
+      match count l_cnt
+      results     result_tab.
+
+    if l_cnt <> 1.
+      return.
+    endif.
+
+    read table result_tab into l_result index 1.
+    l_cnt = lines( l_result-submatches ).
+
+    if l_cnt <> 1.
+      return.
+    endif.
+
+    data l_submatch type submatch_result.
+    read table l_result-submatches into l_submatch index 1.
+
+    r_include = me->a_codeline+l_submatch-offset(l_submatch-length).
+
+  endmethod.
 endclass.
+
 
 ***
 * TEST - CODE OBJECT
@@ -361,7 +451,6 @@ class lcl_code_object_test definition inheriting from cl_aunit_assert final
 
   private section.
     methods load for testing.
-    methods match_include for testing.
 endclass.
 
 class lcl_code_object_test implementation.
@@ -408,17 +497,44 @@ class lcl_code_object_test implementation.
 
   endmethod.
 
-  method match_include.
+endclass.
 
-    assert_equals( act = lcl_code_object=>match_include( 'include z_test1.' )       exp = 'Z_TEST1' ).
-    assert_equals( act = lcl_code_object=>match_include( ' include z_test1. "cmt' ) exp = 'Z_TEST1' ).
-    assert_equals( act = lcl_code_object=>match_include( 'include z_test1' )        exp = '' ).
-    assert_equals( act = lcl_code_object=>match_include( 'inc ude z_test1.' )       exp = '' ).
-    assert_equals( act = lcl_code_object=>match_include( '*include z_test1.' )      exp = '' ).
-    assert_equals( act = lcl_code_object=>match_include( 'include " z_test1.' )     exp = '' ).
+class lcl_include_matcher_test definition inheriting from cl_aunit_assert final
+  for testing duration short risk level harmless.
+  private section.
+    methods match_include for testing.
+endclass.
+
+class lcl_include_matcher_test implementation.
+  method match_include.
+    data lo_matcher type ref to lcl_include_matcher.
+    create object lo_matcher.
+
+    assert_equals( act = lo_matcher->match_include( 'include z_test1.' )      exp = 'Z_TEST1' ).
+    assert_equals( act = lo_matcher->match_include( 'include z_test1' )       exp = '' ).
+    assert_equals( act = lo_matcher->match_include( 'inc ude z_test1.' )      exp = '' ).
+    assert_equals( act = lo_matcher->match_include( '*include z_test1.' )     exp = '' ).
+    assert_equals( act = lo_matcher->match_include( 'include " z_test1.' )    exp = '' ).
+    assert_equals( act = lo_matcher->match_include( 'include structure Z.' )  exp = '' ).
+    assert_equals( act = lo_matcher->match_include( 'include type Z.' )       exp = '' ).
+    assert_equals( act = lo_matcher->match_include( 'include method Z.' )     exp = '' ).
+
+    " multiline
+    assert_equals( act = lo_matcher->match_include( 'include " comment' )     exp = '' ).
+    assert_equals( act = lo_matcher->match_include( 'z_test1' )               exp = '' ).
+    assert_equals( act = lo_matcher->match_include( '.' )                     exp = 'Z_TEST1' ).
+    assert_equals( act = lo_matcher->match_include( 'exporting' )             exp = '' ).
+    assert_equals( act = lo_matcher->match_include( ' include = ' )           exp = '' ).
+    assert_equals( act = lo_matcher->match_include( 'ztest1.' )               exp = '' ).
+    assert_equals( act = lo_matcher->match_include( 'include' )               exp = '' ).
+    assert_equals( act = lo_matcher->match_include( '"comment' )              exp = '' ).
+    assert_equals( act = lo_matcher->match_include( '*comment' )              exp = '' ).
+    assert_equals( act = lo_matcher->match_include( '' )                      exp = '' ).
+    assert_equals( act = lo_matcher->match_include( 'z_test1.' )              exp = 'Z_TEST1' ).
 
   endmethod.
 endclass.
+
 
 **********************************************************************
 * ASSEMBLER CLASS
@@ -569,14 +685,17 @@ endclass.
 **********************************************************************
 class lcl_main definition final.
   public section.
-    class-methods run
+    methods run
       importing
         i_progname        type sobj_name
         i_disable_marking type abap_bool.
+
+    methods list_includes importing io_prog type ref to lcl_code_object.
 endclass.
 
 class lcl_main implementation.
   method run.
+    data lo_ex type ref to lcx_error.
 
     write: / 'Assembling program:', i_progname. "#EC NOTEXT
 
@@ -586,17 +705,13 @@ class lcl_main implementation.
 
     try.
       lo_progcode = lcl_code_object=>load( io_accessor = lo_accessor i_progname = i_progname ).
-    catch lcx_error.
+    catch lcx_error into lo_ex.
       write: / 'ERROR: could not read the program'. "#EC NOTEXT
+      write: / lo_ex->msg.
       return.
     endtry.
 
-    data ls_include type lcl_code_object=>ty_include.
-
-    loop at lo_progcode->at_includes into ls_include.
-      write: / '  include found:', ls_include-obj->a_name, '@line', ls_include-lnum, "#EC NOTEXT
-               'DEVC =', ls_include-obj->a_devclass.
-    endloop.
+    list_includes( lo_progcode ).
 
     data lt_codetab   type abaptxt255_tab.
     data lo_assembler type ref to lcl_assembler.
@@ -619,6 +734,16 @@ class lcl_main implementation.
 
     cl_demo_output=>display( lt_codetab ).
 
+  endmethod.
+
+  method list_includes.
+    data ls_include type lcl_code_object=>ty_include.
+
+    loop at io_prog->at_includes into ls_include.
+      write: / '  include found:', ls_include-obj->a_name, '@line', ls_include-lnum, "#EC NOTEXT
+               'DEVC =', ls_include-obj->a_devclass.
+      list_includes( ls_include-obj ).
+    endloop.
   endmethod.
 endclass.
 
@@ -654,7 +779,9 @@ start-of-selection.
 *  call function 'TR_OBJECT_TABLE'
 *    tables wt_object_text = gt_objects
 *    exceptions others     = 1.
+  data go_main type ref to lcl_main.
 
-  lcl_main=>run(
-      i_progname        = p_prog
-      i_disable_marking = p_womark ).
+  create object go_main.
+  go_main->run(
+    i_progname        = p_prog
+    i_disable_marking = p_womark ).
