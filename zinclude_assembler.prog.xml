@@ -14,7 +14,7 @@
     <TYPE/>
     <OCCURS/>
     <SUBC>1</SUBC>
-    <APPL>*</APPL>
+    <APPL>S</APPL>
     <SECU/>
     <CNAM/>
     <CDAT>0000-00-00</CDAT>
@@ -22,7 +22,7 @@
     <UDAT>0000-00-00</UDAT>
     <VERN/>
     <LEVL/>
-    <RSTAT>T</RSTAT>
+    <RSTAT>S</RSTAT>
     <RMAND/>
     <RLOAD>E</RLOAD>
     <FIXPT>X</FIXPT>
@@ -60,7 +60,7 @@
     <item>
      <ID>R</ID>
      <KEY/>
-     <ENTRY>Include serializer</ENTRY>
+     <ENTRY>Include assembler</ENTRY>
      <LENGTH>23</LENGTH>
      <SPLIT/>
     </item>

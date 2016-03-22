@@ -775,10 +775,6 @@ initialization.
 **********************************************************************
 start-of-selection.
 
-*  data gt_objects type standard table of ko100.
-*  call function 'TR_OBJECT_TABLE'
-*    tables wt_object_text = gt_objects
-*    exceptions others     = 1.
   data go_main type ref to lcl_main.
 
   create object go_main.
