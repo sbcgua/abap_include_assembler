@@ -22,7 +22,7 @@ A tool to statically include includes into the main program. Can be useful to pu
 
 So you develop your program with as many includes as you want. Then run the include assembler and it builds you a single-file program which you publish then.
 
-The result can be save to a file or to **another program** or just shown on screen. "Another program" remains inactive after update. 
+The result can be saved to a file or to **another program** or just shown on screen. "Another program" remains inactive after update. 
 
 ## Technical design and reuse possibilities ##
 
