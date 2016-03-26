@@ -910,12 +910,12 @@ endclass.
 selection-screen begin of block b1 with frame title txt_b1.
 
 selection-screen begin of line.
-selection-screen comment (20) txt_prog  for field p_prog.
+selection-screen comment (24) txt_prog  for field p_prog.
 parameter p_prog type programm default 'ZIS_EXAMPLE' obligatory.
 selection-screen end of line.
 
 selection-screen begin of line.
-selection-screen comment (20) txt_wom  for field p_womark.
+selection-screen comment (24) txt_wom  for field p_womark.
 parameter p_womark type xfeld.
 selection-screen end of line.
 
@@ -924,22 +924,22 @@ selection-screen end of block b1.
 selection-screen begin of block b2 with frame title txt_b2.
 
 selection-screen begin of line.
-selection-screen comment (20) txt_disp  for field p_disp.
+selection-screen comment (24) txt_disp  for field p_disp.
 parameter p_disp   type char1 radiobutton group r1 default 'X'.
 selection-screen end of line.
 
 selection-screen begin of line.
-selection-screen comment (20) txt_file  for field p_file.
+selection-screen comment (24) txt_file  for field p_file.
 parameter p_file type char1 radiobutton group r1.
 selection-screen end of line.
 
 selection-screen begin of line.
-selection-screen comment (20) txt_code  for field p_code.
+selection-screen comment (24) txt_code  for field p_code.
 parameter p_code type char1 radiobutton group r1.
 selection-screen end of line.
 
 selection-screen begin of line.
-selection-screen comment (20) txt_path  for field p_path  modif id pth.
+selection-screen comment (24) txt_path  for field p_path  modif id pth.
 parameter p_path type char255                             modif id pth.
 selection-screen end of line.
 
@@ -947,15 +947,15 @@ selection-screen end of block b2.
 
 
 initialization.
-  txt_b1   = 'Source program'.     "#EC NOTEXT
-  txt_prog = 'Program name'.       "#EC NOTEXT
-  txt_wom  = 'Without markup'.     "#EC NOTEXT
+  txt_b1   = 'Source program'.          "#EC NOTEXT
+  txt_prog = 'Program name'.            "#EC NOTEXT
+  txt_wom  = 'Hide %ASSEMBLY markers'.  "#EC NOTEXT
 
-  txt_b2   = 'Save parameters'.    "#EC NOTEXT
-  txt_disp = 'Show on display'.    "#EC NOTEXT
-  txt_file = 'Save to file'.       "#EC NOTEXT
-  txt_code = 'Save to target PROG'.  "#EC NOTEXT
-  txt_path = 'Path to file or prog'. "#EC NOTEXT
+  txt_b2   = 'Save parameters'.         "#EC NOTEXT
+  txt_disp = 'Show on display'.         "#EC NOTEXT
+  txt_file = 'Save to file'.            "#EC NOTEXT
+  txt_code = 'Save to target program'.  "#EC NOTEXT
+  txt_path = 'Path to file / Prog name'."#EC NOTEXT
 
   " TODO normal parameters show/hide and file/prog-search
 
