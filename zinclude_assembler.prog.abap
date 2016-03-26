@@ -64,11 +64,18 @@ endclass.
 interface lif_devobj_accessor.
   methods get_prog_code importing i_progname       type sobj_name
                         returning value(r_codetab) type abaptxt255_tab
-                        raising lcx_error.
+                        raising   lcx_error.
   methods get_prog_devc importing i_progname       type sobj_name
                         returning value(r_devc)    type devclass
-                        raising lcx_error.
+                        raising   lcx_error.
 endinterface.
+
+interface lif_devobj_saver.
+  methods save_prog     importing i_path     type string
+                                  i_codetab  type abaptxt255_tab
+                        raising   lcx_error.
+endinterface.
+
 
 **********************************************************************
 * INTERFACE IMPLEMENTATION FOR CODE EXTRACTION
@@ -92,7 +99,7 @@ class lcl_extractor implementation.
       exceptions others     = 1.
 
     if sy-subrc <> 0 or l_status <> 'X'. " Exist and active
-      lcx_error=>raise( |check_exist { i_progname }| ).
+      lcx_error=>raise( |check_exist { i_progname }| ).  "#EC NOTEXT
     endif.
 
     data ls_tadir type tadir.
@@ -103,42 +110,27 @@ class lcl_extractor implementation.
       and   obj_name = i_progname.
 
     if sy-subrc <> 0.
-      lcx_error=>raise( |select tadir { i_progname }| ).
+      lcx_error=>raise( |select tadir { i_progname }| ).  "#EC NOTEXT
     endif.
 
-    data lt_e071 type standard table of e071.
-    data ls_e071 type e071.
-    move-corresponding ls_tadir to ls_e071.
+    data lt_codetab type abaptxt255_tab.
 
-    call function 'SUMO_RESOLVE_E071_OBJ'
-      exporting e071_obj = ls_e071
-      tables obj_tab     = lt_e071[]
-      exceptions others  = 1.
-
-    if sy-subrc <> 0.
-      lcx_error=>raise( |sumo_resolve { i_progname }| ).
+    call function 'RPY_PROGRAM_READ'
+      exporting
+        program_name     = i_progname
+        with_lowercase   = 'X'
+      tables
+        source_extended  = lt_codetab
+      exceptions
+        cancelled        = 1
+        not_found        = 2
+        permission_error = 3
+        others           = 4.
+    if sy-subrc is not initial.
+      lcx_error=>raise( |Cannot read program| ).  "#EC NOTEXT
     endif.
 
-    read table lt_e071 into ls_e071 with key object = 'REPS'.
-
-    if sy-subrc <> 0.
-      lcx_error=>raise( |no REPS object { i_progname }| ).
-    endif.
-
-    data l_obj type svrs2_versionable_object.
-
-    l_obj-objtype = ls_e071-object.
-    l_obj-objname = ls_e071-obj_name.
-
-    call function 'SVRS_GET_VERSION_REPOSITORY'
-      changing obj      = l_obj
-      exceptions others = 1.
-
-    if sy-subrc <> 0.
-      lcx_error=>raise( |svrs_get_version... { i_progname }| ).
-    endif.
-
-    r_codetab = l_obj-reps-abaptext.
+    r_codetab = lt_codetab.
 
   endmethod. "lif_devobj_accessor~get_prog_code
 
@@ -151,7 +143,7 @@ class lcl_extractor implementation.
       and   obj_name = i_progname.
 
     if sy-subrc <> 0.
-      lcx_error=>raise( |select devclass { i_progname }| ).
+      lcx_error=>raise( |select devclass { i_progname }| ).  "#EC NOTEXT
     endif.
 
   endmethod. "lif_devobj_accessor~get_prog_devc
@@ -222,18 +214,18 @@ class lcl_dummy_extractor implementation.
 
     case i_progname.
       when 'XTESTPROG'.
-        append_codeline 'report xtestprog.'.          "#EC NOTEXT
-        append_codeline 'include xtestprog_top.'.     "#EC NOTEXT
-        append_codeline 'include xtestprog_f01.'.     "#EC NOTEXT
-        append_codeline 'include xtestprog_ext.'.     "#EC NOTEXT
-        append_codeline 'start-of-selection.'.        "#EC NOTEXT
-        append_codeline '  perform perform_write.'.   "#EC NOTEXT
+        append_codeline 'report xtestprog.'.              "#EC NOTEXT
+        append_codeline 'include xtestprog_top.'.         "#EC NOTEXT
+        append_codeline 'include xtestprog_f01.'.         "#EC NOTEXT
+        append_codeline 'include xtestprog_ext.'.         "#EC NOTEXT
+        append_codeline 'start-of-selection.'.            "#EC NOTEXT
+        append_codeline '  perform perform_write.'.       "#EC NOTEXT
       when 'XTESTPROG_TOP'.
-        append_codeline 'include xtestprog_doc.'.              "#EC NOTEXT
-        append_codeline 'constants gstr type char4 value ''Test''.'. "#EC NOTEXT
-        append_codeline 'types: begin of t_sometype.'.         "#EC NOTEXT
-        append_codeline '        include structure textpool.'. "#EC NOTEXT
-        append_codeline 'types: end of t_sometype.'.           "#EC NOTEXT
+        append_codeline 'include xtestprog_doc.'.                     "#EC NOTEXT
+        append_codeline 'constants gstr type char4 value ''Test''.'.  "#EC NOTEXT
+        append_codeline 'types: begin of t_sometype.'.                "#EC NOTEXT
+        append_codeline '        include structure textpool.'.        "#EC NOTEXT
+        append_codeline 'types: end of t_sometype.'.                  "#EC NOTEXT
       when 'XTESTPROG_F01'.
         append_codeline 'form perform_write.'.            "#EC NOTEXT
         append_codeline '  write / gstr.'.                "#EC NOTEXT
@@ -247,17 +239,17 @@ class lcl_dummy_extractor implementation.
         append_codeline '*include xtestprog_top.'.        "#EC NOTEXT
         append_codeline '*include xtestprog_doc.'.        "#EC NOTEXT
         append_codeline '*Just some documentation here'.  "#EC NOTEXT
-        append_codeline '"'.
-        append_codeline 'constants gstr type char4 value ''Test''.'. "#EC NOTEXT
-        append_codeline 'types: begin of t_sometype.'.         "#EC NOTEXT
-        append_codeline '        include structure textpool.'. "#EC NOTEXT
-        append_codeline 'types: end of t_sometype.'.           "#EC NOTEXT
-        append_codeline '"'.
+        append_codeline ''.
+        append_codeline 'constants gstr type char4 value ''Test''.'.  "#EC NOTEXT
+        append_codeline 'types: begin of t_sometype.'.                "#EC NOTEXT
+        append_codeline '        include structure textpool.'.        "#EC NOTEXT
+        append_codeline 'types: end of t_sometype.'.                  "#EC NOTEXT
+        append_codeline ''.
         append_codeline '*include xtestprog_f01.'.        "#EC NOTEXT
         append_codeline 'form perform_write.'.            "#EC NOTEXT
         append_codeline '  write / gstr.'.                "#EC NOTEXT
         append_codeline 'endform.'.                       "#EC NOTEXT
-        append_codeline '"'.
+        append_codeline ''.
         append_codeline 'include xtestprog_ext.'.         "#EC NOTEXT
         append_codeline 'start-of-selection.'.            "#EC NOTEXT
         append_codeline '  perform perform_write.'.       "#EC NOTEXT
@@ -596,11 +588,10 @@ class lcl_assembler implementation.
 
           add_marker_line '*%%ASSEMBLY-START @{INC}'.
           append l_line to lt_codetab.
-          add_marker_line '*%%ASSEMBLY-INCLUDE @{INC}'.
           append lines of lt_codeinc to lt_codetab.
-          add_marker_line '*%%ASSEMBLY-END @{INC}'.
+          add_marker_line '*%%ASSEMBLY-END   @{INC}'.
 
-          l_line-line = '"'. " TODO - change this when normal output is ready
+          l_line-line = ''.
           append l_line to lt_codetab.
         else.
           append l_line to lt_codetab.
@@ -679,6 +670,137 @@ class lcl_assembler_test implementation.
   endmethod.
 endclass.
 
+**********************************************************************
+* SAVERS
+**********************************************************************
+
+* SAVE TO DISPLAY -> SHOW
+class lcl_saver_to_display definition final.
+  public section.
+    interfaces lif_devobj_saver.
+endclass.
+
+class lcl_saver_to_display implementation.
+  method lif_devobj_saver~save_prog.
+
+    cl_demo_output=>display( i_codetab ).
+
+  endmethod.
+endclass.
+
+* SAVE TO PROGRAM
+class lcl_saver_to_program definition final.
+  public section.
+    interfaces lif_devobj_saver.
+endclass.
+
+class lcl_saver_to_program implementation.
+  method lif_devobj_saver~save_prog.
+    if strlen( i_path ) > 40.
+      lcx_error=>raise( 'Program name must be <= 40 symbols' ). "#EC NOTEXT
+    endif.
+
+    if i_path is initial.
+      lcx_error=>raise( 'Target program name is empty' ).       "#EC NOTEXT
+    endif.
+
+    data l_progname type reposrc-progname.
+    select single progname from reposrc into l_progname
+      where progname = i_path.
+
+    if sy-subrc is not initial.
+      lcx_error=>raise( |Target program { i_path } must be created manually first| ). "#EC NOTEXT
+    endif.
+
+    call function 'RPY_PROGRAM_UPDATE'
+      exporting
+        program_name     = l_progname
+        save_inactive    = 'I'
+      tables
+        source_extended  = i_codetab
+      exceptions
+        cancelled        = 1
+        permission_error = 2
+        not_found        = 3
+        others           = 4.
+
+    IF sy-subrc is not initial.
+      if sy-msgid = 'EU' and sy-msgno = '510'.
+        lcx_error=>raise( |Target program { i_path } is being edited by someone else| ). "#EC NOTEXT
+      else.
+        lcx_error=>raise( |Cannot update program { i_path }| ). "#EC NOTEXT
+      endif.
+    endif.
+
+  endmethod.
+endclass.
+
+* SAVE TO FILE
+class lcl_saver_to_file definition final.
+  public section.
+    interfaces lif_devobj_saver.
+endclass.
+
+class lcl_saver_to_file implementation.
+  method lif_devobj_saver~save_prog.
+    data l_length type i.
+    data lt_data  type xml_rawdata.
+
+    if i_path is initial.
+      lcx_error=>raise( 'Path is empty' ).             "#EC NOTEXT
+    endif.
+
+    call function 'SCMS_TEXT_TO_BINARY'
+      exporting  encoding      = '4110'
+      importing  output_length = l_length
+      tables     text_tab      = i_codetab
+                 binary_tab    = lt_data
+      exceptions failed        = 1.
+
+    if sy-subrc is not initial.
+      lcx_error=>raise( 'Cannot convert to binary' ).  "#EC NOTEXT
+    endif.
+
+    call method cl_gui_frontend_services=>gui_download
+      exporting
+        bin_filesize            = l_length
+        filename                = i_path
+        filetype                = 'BIN'
+      changing
+        data_tab                = lt_data
+      exceptions
+        file_write_error        = 1
+        no_batch                = 2
+        gui_refuse_filetransfer = 3
+        invalid_type            = 4
+        no_authority            = 5
+        unknown_error           = 6
+        header_not_allowed      = 7
+        separator_not_allowed   = 8
+        filesize_not_allowed    = 9
+        header_too_long         = 10
+        dp_error_create         = 11
+        dp_error_send           = 12
+        dp_error_write          = 13
+        unknown_dp_error        = 14
+        access_denied           = 15
+        dp_out_of_memory        = 16
+        disk_full               = 17
+        dp_timeout              = 18
+        file_not_found          = 19
+        dataprovider_exception  = 20
+        control_flush_error     = 21
+        not_supported_by_gui    = 22
+        error_no_gui            = 23
+        others                  = 24.
+
+    if sy-subrc is not initial.
+      lcx_error=>raise( |Cannot save file ({ sy-subrc })| ). "#EC NOTEXT
+    endif.
+
+  endmethod.
+endclass.
+
 
 **********************************************************************
 * MAIN
@@ -688,14 +810,17 @@ class lcl_main definition final.
     methods run
       importing
         i_progname        type sobj_name
-        i_disable_marking type abap_bool.
+        i_disable_marking type abap_bool
+        i_path            type char255
+        i_saver           type char1.
 
     methods list_includes importing io_prog type ref to lcl_code_object.
 endclass.
 
 class lcl_main implementation.
   method run.
-    data lo_ex type ref to lcx_error.
+    data lo_ex  type ref to lcx_error.
+    data l_path type string.
 
     write: / 'Assembling program:', i_progname. "#EC NOTEXT
 
@@ -721,26 +846,57 @@ class lcl_main implementation.
     ls_params-disable_marking = i_disable_marking.
     lt_codetab = lo_assembler->assemble( ls_params ).
 
-    skip.
-    uline.
-*    data l_line     type abaptxt255.
-*    loop at lt_codetab into l_line.
-*      if l_line-line is initial.
-*        skip.
-*      else.
-*        write / l_line-line.
-*      endif.
-*    endloop.
+    skip. uline.
 
-    cl_demo_output=>display( lt_codetab ).
+    data lo_saver type ref to lif_devobj_saver.
+
+    l_path = i_path.
+    case i_saver.
+      when 'D'.
+        create object lo_saver type lcl_saver_to_display.
+        clear l_path.
+
+      when 'F'.
+        create object lo_saver type lcl_saver_to_file.
+
+        data len type i.
+        len = strlen( l_path ) - 1.
+        if len >= 0 and i_path+len(1) = '\'.
+          concatenate l_path i_progname '.abap' into l_path. "#EC NOTEXT
+        endif.
+
+      when 'C'.
+        create object lo_saver type lcl_saver_to_program.
+
+      when others.
+        write: / 'ERROR: unknown saver'. "#EC NOTEXT
+    endcase.
+
+    try.
+      lo_saver->save_prog( i_path = l_path i_codetab = lt_codetab ).
+    catch lcx_error into lo_ex.
+      write: / 'ERROR: cannot save code'. "#EC NOTEXT
+      write: / lo_ex->msg.
+      return.
+    endtry.
+
+    case i_saver.
+      when 'F'.
+        write: / 'Result saved to file:', l_path.     "#EC NOTEXT
+      when 'C'.
+        write: / 'Result saved to program:', l_path.  "#EC NOTEXT
+        write: / 'The program remained inactive'.      "#EC NOTEXT
+    endcase.
 
   endmethod.
 
   method list_includes.
     data ls_include type lcl_code_object=>ty_include.
+    data l_tmp      type string.
 
     loop at io_prog->at_includes into ls_include.
-      write: / '  include found:', ls_include-obj->a_name, '@line', ls_include-lnum, "#EC NOTEXT
+      l_tmp = |@{ io_prog->a_name }:{ ls_include-lnum } |.
+      write: / '  include found:', ls_include-obj->a_name, l_tmp, "#EC NOTEXT
                'DEVC =', ls_include-obj->a_devclass.
       list_includes( ls_include-obj ).
     endloop.
@@ -765,10 +921,43 @@ selection-screen end of line.
 
 selection-screen end of block b1.
 
+selection-screen begin of block b2 with frame title txt_b2.
+
+selection-screen begin of line.
+selection-screen comment (20) txt_disp  for field p_disp.
+parameter p_disp   type char1 radiobutton group r1 default 'X'.
+selection-screen end of line.
+
+selection-screen begin of line.
+selection-screen comment (20) txt_file  for field p_file.
+parameter p_file type char1 radiobutton group r1.
+selection-screen end of line.
+
+selection-screen begin of line.
+selection-screen comment (20) txt_code  for field p_code.
+parameter p_code type char1 radiobutton group r1.
+selection-screen end of line.
+
+selection-screen begin of line.
+selection-screen comment (20) txt_path  for field p_path  modif id pth.
+parameter p_path type char255                             modif id pth.
+selection-screen end of line.
+
+selection-screen end of block b2.
+
+
 initialization.
-  txt_b1   = 'Control parameneters'. "#EC NOTEXT
-  txt_prog = 'Program name'.         "#EC NOTEXT
-  txt_wom  = 'Without markup'.       "#EC NOTEXT
+  txt_b1   = 'Source program'.     "#EC NOTEXT
+  txt_prog = 'Program name'.       "#EC NOTEXT
+  txt_wom  = 'Without markup'.     "#EC NOTEXT
+
+  txt_b2   = 'Save parameters'.    "#EC NOTEXT
+  txt_disp = 'Show on display'.    "#EC NOTEXT
+  txt_file = 'Save to file'.       "#EC NOTEXT
+  txt_code = 'Save to target PROG'.  "#EC NOTEXT
+  txt_path = 'Path to file or prog'. "#EC NOTEXT
+
+  " TODO normal parameters show/hide and file/prog-search
 
 **********************************************************************
 * ENTRY POINT
@@ -776,8 +965,20 @@ initialization.
 start-of-selection.
 
   data go_main type ref to lcl_main.
+  data l_saver type char1.
+
+  case 'X'.
+    when p_disp.
+      l_saver = 'D'.
+    when p_file.
+      l_saver = 'F'.
+    when p_code.
+      l_saver = 'C'.
+  endcase.
 
   create object go_main.
   go_main->run(
     i_progname        = p_prog
-    i_disable_marking = p_womark ).
+    i_disable_marking = p_womark
+    i_path            = p_path
+    i_saver           = l_saver ).
