@@ -3,7 +3,7 @@
 *|                                                                                |
 *| The MIT License (MIT)                                                          |
 *|                                                                                |
-*| Copyright (c) 2016 Alexander Tsybulsky, SBCG Team (www.sbcg.com.ua)            |
+*| Copyright (c) 2019 Alexander Tsybulsky                                         |
 *|                                                                                |
 *| Permission is hereby granted, free of charge, to any person obtaining a copy   |
 *| of this software and associated documentation files (the "Software"), to deal  |
@@ -25,7 +25,7 @@
 *\--------------------------------------------------------------------------------/
 */--------------------------------------------------------------------------------\
 *| Developers : Alexander Tsybulsky (atsybulsky@sbcg.com.ua)                      |
-*| project homepage: https://github.com/sbcgua/mockup_loader                      |
+*| project homepage: https://github.com/sbcgua/abap_include_assembler             |
 *\--------------------------------------------------------------------------------/
 
 report zinclude_assembler.
@@ -62,18 +62,29 @@ endclass.
 **********************************************************************
 
 interface lif_devobj_accessor.
-  methods get_prog_code importing i_progname       type sobj_name
-                        returning value(r_codetab) type abaptxt255_tab
-                        raising   lcx_error.
-  methods get_prog_devc importing i_progname       type sobj_name
-                        returning value(r_devc)    type devclass
-                        raising   lcx_error.
+  methods get_prog_code
+    importing
+      i_progname       type sobj_name
+    returning
+      value(r_codetab) type abaptxt255_tab
+    raising
+      lcx_error.
+  methods get_prog_devc
+    importing
+      i_progname       type sobj_name
+    returning
+      value(r_devc)    type devclass
+    raising
+      lcx_error.
 endinterface.
 
 interface lif_devobj_saver.
-  methods save_prog     importing i_path     type string
-                                  i_codetab  type abaptxt255_tab
-                        raising   lcx_error.
+  methods save_prog
+    importing
+      i_path    type string
+      i_codetab type abaptxt255_tab
+    raising
+      lcx_error.
 endinterface.
 
 
@@ -92,11 +103,14 @@ class lcl_extractor implementation.
     data l_status type c.
 
     call function 'CHECK_EXIST'
-      exporting iv_pgmid    = 'R3TR'
-                iv_object   = 'PROG'
-                iv_obj_name = i_progname
-      importing e_exist     = l_status
-      exceptions others     = 1.
+      exporting
+        iv_pgmid    = 'R3TR'
+        iv_object   = 'PROG'
+        iv_obj_name = i_progname
+      importing
+        e_exist     = l_status
+      exceptions
+        others     = 1.
 
     if sy-subrc <> 0 or l_status <> 'X'. " Exist and active
       lcx_error=>raise( |check_exist { i_progname }| ).  "#EC NOTEXT
@@ -154,8 +168,10 @@ endclass.
 * TEST  - CODE EXTRACTOR
 ***
 
-class lcl_extractor_test definition inheriting from cl_aunit_assert final
-  for testing duration short risk level harmless.
+class lcl_extractor_test definition final
+  for testing
+  duration short
+  risk level harmless.
 
   private section.
     methods get_prog_code for testing.
@@ -172,22 +188,22 @@ class lcl_extractor_test implementation.
 
     try.
       clear sy-subrc.
-      lt_code = lo_if->get_prog_code( i_progname   = '~~DOES~NOT~EXIST~~' ).
+      lt_code = lo_if->get_prog_code( i_progname = '~~DOES~NOT~EXIST~~' ).
     catch lcx_error.
       sy-subrc = 1.
     endtry.
 
-    assert_subrc( act = sy-subrc  exp = 1 ).
+    cl_abap_unit_assert=>assert_subrc( act = sy-subrc  exp = 1 ).
 
     try.
       clear sy-subrc.
-      lt_code = lo_if->get_prog_code( i_progname   = sy-cprog ).
+      lt_code = lo_if->get_prog_code( i_progname = sy-cprog ).
     catch lcx_error.
       sy-subrc = 1.
     endtry.
 
-    assert_subrc( act = sy-subrc  exp = 0 ).
-    assert_not_initial( act = lines( lt_code ) ).
+    cl_abap_unit_assert=>assert_subrc( act = sy-subrc  exp = 0 ).
+    cl_abap_unit_assert=>assert_not_initial( act = lines( lt_code ) ).
 
   endmethod.
 endclass.
@@ -286,33 +302,45 @@ endclass.
 
 class lcl_code_object definition create private final.
   public section.
-    types:  begin of ty_include,
-              lnum  type i,
-              obj   type ref to lcl_code_object,
-            end of ty_include.
+    types:
+      begin of ty_include,
+        lnum  type i,
+        obj   type ref to lcl_code_object,
+      end of ty_include.
 
     data a_name      type sobj_name.
     data at_includes type standard table of ty_include read-only.
     data at_codetab  type abaptxt255_tab read-only.
     data a_devclass  type devclass read-only.
 
-    class-methods load importing io_accessor type ref to lif_devobj_accessor
-                                 i_progname  type sobj_name
-                       returning value(ro_obj) type ref to lcl_code_object
-                       raising lcx_error.
+    class-methods load
+      importing
+        io_accessor type ref to lif_devobj_accessor
+        i_progname  type sobj_name
+      returning
+        value(ro_obj) type ref to lcl_code_object
+      raising
+        lcx_error.
 endclass.
 
 class lcl_include_matcher definition final.
   " I hope I'm not going to far with this parsing thing ... to reconsider RS_GET_ALL_INCLUDES, see #1
   public section.
-    methods match_include importing i_abapline       type abaptxt255-line
-                          returning value(r_include) type sobj_name.
+    methods match_include
+      importing
+        i_abapline       type abaptxt255-line
+      returning
+        value(r_include) type sobj_name.
   private section.
     data a_codeline        type string.
     data a_lines_collected type i.
 
-    methods collect_line importing i_abapline   type abaptxt255-line.
-    methods do_match returning value(r_include) type sobj_name.
+    methods collect_line
+      importing
+        i_abapline   type abaptxt255-line.
+    methods do_match
+      returning
+        value(r_include) type sobj_name.
 endclass.
 
 class lcl_code_object implementation.
@@ -438,11 +466,13 @@ endclass.
 * TEST - CODE OBJECT
 ***
 
-class lcl_code_object_test definition inheriting from cl_aunit_assert final
-  for testing duration short risk level harmless.
+class lcl_code_object_test definition final
+  for testing
+  duration short
+  risk level harmless.
 
   private section.
-    methods load for testing.
+    methods load for testing raising lcx_error.
 endclass.
 
 class lcl_code_object_test implementation.
@@ -452,47 +482,59 @@ class lcl_code_object_test implementation.
 
     create object lo_acc.
 
-    try.
-      lo_obj = lcl_code_object=>load( io_accessor = lo_acc i_progname = 'XTESTPROG' ).
+    lo_obj = lcl_code_object=>load( io_accessor = lo_acc i_progname = 'XTESTPROG' ).
 
-      assert_not_initial( act = lines( lo_obj->at_codetab ) ).
-      assert_not_initial( act = lines( lo_obj->at_includes ) ).
-      assert_equals(      act = lo_obj->a_devclass  exp = 'XTEST' ).
-      assert_equals(      exp = lo_acc->lif_devobj_accessor~get_prog_code( 'XTESTPROG' )
-                          act = lo_obj->at_codetab ).
+    cl_abap_unit_assert=>assert_not_initial( act = lines( lo_obj->at_codetab ) ).
+    cl_abap_unit_assert=>assert_not_initial( act = lines( lo_obj->at_includes ) ).
+    cl_abap_unit_assert=>assert_equals(
+      act = lo_obj->a_devclass
+      exp = 'XTEST' ).
+    cl_abap_unit_assert=>assert_equals(
+      exp = lo_acc->lif_devobj_accessor~get_prog_code( 'XTESTPROG' )
+      act = lo_obj->at_codetab ).
 
-      data ls_include type lcl_code_object=>ty_include.
-      read table lo_obj->at_includes into ls_include index 1.
-      assert_not_initial( act = lines( ls_include-obj->at_codetab ) ).
-      assert_not_initial( act = lines( ls_include-obj->at_includes ) ).
-      assert_equals(      act = ls_include-obj->a_devclass  exp = 'XTEST' ).
-      assert_equals(      act = ls_include-lnum exp = 2 ).
-      assert_equals(      exp = lo_acc->lif_devobj_accessor~get_prog_code( 'XTESTPROG_TOP' )
-                          act = ls_include-obj->at_codetab ).
+    data ls_include type lcl_code_object=>ty_include.
+    read table lo_obj->at_includes into ls_include index 1.
+    cl_abap_unit_assert=>assert_not_initial( act = lines( ls_include-obj->at_codetab ) ).
+    cl_abap_unit_assert=>assert_not_initial( act = lines( ls_include-obj->at_includes ) ).
+    cl_abap_unit_assert=>assert_equals(
+      act = ls_include-obj->a_devclass
+      exp = 'XTEST' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = ls_include-lnum
+      exp = 2 ).
+    cl_abap_unit_assert=>assert_equals(
+      exp = lo_acc->lif_devobj_accessor~get_prog_code( 'XTESTPROG_TOP' )
+      act = ls_include-obj->at_codetab ).
 
-      read table lo_obj->at_includes into ls_include index 2.
-      assert_not_initial( act = lines( ls_include-obj->at_codetab ) ).
-      assert_initial(     act = lines( ls_include-obj->at_includes ) ).
-      assert_equals(      act = ls_include-obj->a_devclass  exp = 'XTEST' ).
-      assert_equals(      act = ls_include-lnum exp = 3 ).
-      assert_equals(      exp = lo_acc->lif_devobj_accessor~get_prog_code( 'XTESTPROG_F01' )
-                          act = ls_include-obj->at_codetab ).
+    read table lo_obj->at_includes into ls_include index 2.
+    cl_abap_unit_assert=>assert_not_initial( act = lines( ls_include-obj->at_codetab ) ).
+    cl_abap_unit_assert=>assert_initial( act = lines( ls_include-obj->at_includes ) ).
+    cl_abap_unit_assert=>assert_equals(
+      act = ls_include-obj->a_devclass
+      exp = 'XTEST' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = ls_include-lnum
+      exp = 3 ).
+    cl_abap_unit_assert=>assert_equals(
+      exp = lo_acc->lif_devobj_accessor~get_prog_code( 'XTESTPROG_F01' )
+      act = ls_include-obj->at_codetab ).
 
-      read table lo_obj->at_includes into ls_include index 3.
-      assert_not_initial( act = lines( ls_include-obj->at_codetab ) ).
-      assert_initial(     act = lines( ls_include-obj->at_includes ) ).
-      assert_equals(      act = ls_include-obj->a_devclass  exp = 'XTEST_EXT' ).
-
-    catch lcx_error.
-      fail( ).
-    endtry.
+    read table lo_obj->at_includes into ls_include index 3.
+    cl_abap_unit_assert=>assert_not_initial( act = lines( ls_include-obj->at_codetab ) ).
+    cl_abap_unit_assert=>assert_initial( act = lines( ls_include-obj->at_includes ) ).
+    cl_abap_unit_assert=>assert_equals(
+      act = ls_include-obj->a_devclass
+      exp = 'XTEST_EXT' ).
 
   endmethod.
 
 endclass.
 
-class lcl_include_matcher_test definition inheriting from cl_aunit_assert final
-  for testing duration short risk level harmless.
+class lcl_include_matcher_test definition final
+  for testing
+  duration short
+  risk level harmless.
   private section.
     methods match_include for testing.
 endclass.
@@ -502,27 +544,27 @@ class lcl_include_matcher_test implementation.
     data lo_matcher type ref to lcl_include_matcher.
     create object lo_matcher.
 
-    assert_equals( act = lo_matcher->match_include( 'include z_test1.' )      exp = 'Z_TEST1' ).
-    assert_equals( act = lo_matcher->match_include( 'include z_test1' )       exp = '' ).
-    assert_equals( act = lo_matcher->match_include( 'inc ude z_test1.' )      exp = '' ).
-    assert_equals( act = lo_matcher->match_include( '*include z_test1.' )     exp = '' ).
-    assert_equals( act = lo_matcher->match_include( 'include " z_test1.' )    exp = '' ).
-    assert_equals( act = lo_matcher->match_include( 'include structure Z.' )  exp = '' ).
-    assert_equals( act = lo_matcher->match_include( 'include type Z.' )       exp = '' ).
-    assert_equals( act = lo_matcher->match_include( 'include method Z.' )     exp = '' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_matcher->match_include( 'include z_test1.' )      exp = 'Z_TEST1' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_matcher->match_include( 'include z_test1' )       exp = '' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_matcher->match_include( 'inc ude z_test1.' )      exp = '' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_matcher->match_include( '*include z_test1.' )     exp = '' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_matcher->match_include( 'include " z_test1.' )    exp = '' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_matcher->match_include( 'include structure Z.' )  exp = '' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_matcher->match_include( 'include type Z.' )       exp = '' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_matcher->match_include( 'include method Z.' )     exp = '' ).
 
     " multiline
-    assert_equals( act = lo_matcher->match_include( 'include " comment' )     exp = '' ).
-    assert_equals( act = lo_matcher->match_include( 'z_test1' )               exp = '' ).
-    assert_equals( act = lo_matcher->match_include( '.' )                     exp = 'Z_TEST1' ).
-    assert_equals( act = lo_matcher->match_include( 'exporting' )             exp = '' ).
-    assert_equals( act = lo_matcher->match_include( ' include = ' )           exp = '' ).
-    assert_equals( act = lo_matcher->match_include( 'ztest1.' )               exp = '' ).
-    assert_equals( act = lo_matcher->match_include( 'include' )               exp = '' ).
-    assert_equals( act = lo_matcher->match_include( '"comment' )              exp = '' ).
-    assert_equals( act = lo_matcher->match_include( '*comment' )              exp = '' ).
-    assert_equals( act = lo_matcher->match_include( '' )                      exp = '' ).
-    assert_equals( act = lo_matcher->match_include( 'z_test1.' )              exp = 'Z_TEST1' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_matcher->match_include( 'include " comment' )     exp = '' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_matcher->match_include( 'z_test1' )               exp = '' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_matcher->match_include( '.' )                     exp = 'Z_TEST1' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_matcher->match_include( 'exporting' )             exp = '' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_matcher->match_include( ' include = ' )           exp = '' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_matcher->match_include( 'ztest1.' )               exp = '' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_matcher->match_include( 'include' )               exp = '' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_matcher->match_include( '"comment' )              exp = '' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_matcher->match_include( '*comment' )              exp = '' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_matcher->match_include( '' )                      exp = '' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_matcher->match_include( 'z_test1.' )              exp = 'Z_TEST1' ).
 
   endmethod.
 endclass.
@@ -534,21 +576,33 @@ endclass.
 
 class lcl_assembler definition final.
   public section.
-    types: begin of ty_params,
-             disable_marking type abap_bool,
-           end of ty_params.
+    types:
+      begin of ty_params,
+        disable_marking type abap_bool,
+      end of ty_params.
 
-    methods constructor importing io_prog type ref to lcl_code_object.
-    methods assemble importing i_params type ty_params optional
-                     returning value(r_codetab) type abaptxt255_tab.
+    methods constructor
+      importing
+        io_prog type ref to lcl_code_object.
+    methods assemble
+      importing
+        i_params type ty_params optional
+      returning
+        value(r_codetab) type abaptxt255_tab.
   private section.
     data as_params type ty_params.
     data o_prog    type ref to lcl_code_object.
 
-    methods pad_line importing i_str type text255
-                     returning value(r_str) type text255.
-    methods _assemble importing io_prog type ref to lcl_code_object
-                      returning value(r_codetab) type abaptxt255_tab.
+    methods pad_line
+      importing
+        i_str type text255
+      returning
+        value(r_str) type text255.
+    methods _assemble
+      importing
+        io_prog type ref to lcl_code_object
+      returning
+        value(r_codetab) type abaptxt255_tab.
 endclass.
 
 class lcl_assembler implementation.
@@ -634,11 +688,13 @@ endclass.
 * TEST - ASSEMBLER
 ***
 
-class lcl_assembler_test definition inheriting from cl_aunit_assert final
-  for testing duration short risk level harmless.
+class lcl_assembler_test definition final
+  for testing
+  duration short
+  risk level harmless.
 
   private section.
-    methods assemble for testing.
+    methods assemble for testing raising lcx_error.
 endclass.
 
 class lcl_assembler_test implementation.
@@ -648,13 +704,8 @@ class lcl_assembler_test implementation.
     data lt_exp  type abaptxt255_tab.
 
     create object lo_acc.
-
-    try.
-      lo_prog = lcl_code_object=>load( io_accessor = lo_acc i_progname = 'XTESTPROG' ).
-      lt_exp  = lo_acc->lif_devobj_accessor~get_prog_code( 'ASSEMBLED_RESULT' ).
-    catch lcx_error.
-      fail( ).
-    endtry.
+    lo_prog = lcl_code_object=>load( io_accessor = lo_acc i_progname = 'XTESTPROG' ).
+    lt_exp  = lo_acc->lif_devobj_accessor~get_prog_code( 'ASSEMBLED_RESULT' ).
 
     data lo_assembler type ref to lcl_assembler.
     create object lo_assembler exporting io_prog = lo_prog.
@@ -664,8 +715,9 @@ class lcl_assembler_test implementation.
     ls_params-disable_marking = abap_true.
     lt_code = lo_assembler->assemble( ls_params ).
 
-    assert_equals( exp = lt_exp
-                   act = lt_code ).
+    cl_abap_unit_assert=>assert_equals(
+      exp = lt_exp
+      act = lt_code ).
 
   endmethod.
 endclass.
@@ -682,9 +734,7 @@ endclass.
 
 class lcl_saver_to_display implementation.
   method lif_devobj_saver~save_prog.
-
     cl_demo_output=>display( i_codetab ).
-
   endmethod.
 endclass.
 
@@ -751,10 +801,13 @@ class lcl_saver_to_file implementation.
     endif.
 
     call function 'SCMS_TEXT_TO_BINARY'
-      exporting  encoding      = '4110'
-      importing  output_length = l_length
-      tables     text_tab      = i_codetab
-                 binary_tab    = lt_data
+      exporting
+        encoding      = '4110'
+      importing
+        output_length = l_length
+      tables
+        text_tab      = i_codetab
+        binary_tab    = lt_data
       exceptions failed        = 1.
 
     if sy-subrc is not initial.
