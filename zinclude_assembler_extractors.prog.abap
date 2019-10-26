@@ -70,12 +70,53 @@ class lcl_extractor_prog implementation.
       and   obj_name = i_progname.
 
     if sy-subrc <> 0.
-      lcx_error=>raise( |select devclass { i_progname }| ).  "#EC NOTEXT
+      lcx_error=>raise( |Cannot find devclass { i_progname }| ).  "#EC NOTEXT
     endif.
 
   endmethod. "lif_devobj_accessor~get_prog_devc
 
 endclass.
+
+class lcl_extractor_clas definition final.
+  public section.
+    interfaces lif_devobj_accessor.
+endclass.
+
+class lcl_extractor_clas implementation.
+
+  method lif_devobj_accessor~get_code.
+
+    data lo_factory type ref to cl_oo_factory.
+    lo_factory = cl_oo_factory=>create_instance( ).
+
+    data lo_source type ref to if_oo_clif_source.
+    lo_source = lo_factory->create_clif_source(
+      clif_name = i_progname
+      version = 'A' ).
+
+    data lt_source type string_table.
+    lo_source->get_source( importing source = lt_source ).
+
+    r_codetab = lt_source.
+
+  endmethod. "lif_devobj_accessor~get_prog_code
+
+  method lif_devobj_accessor~get_devc.
+
+    select single devclass into r_devc
+      from tadir
+      where pgmid    = 'R3TR'
+      and   object   = 'CLAS'
+      and   obj_name = i_progname.
+
+    if sy-subrc <> 0.
+      lcx_error=>raise( |Cannot find devclass { i_progname }| ).  "#EC NOTEXT
+    endif.
+
+  endmethod. "lif_devobj_accessor~get_prog_devc
+
+endclass.
+
 
 
 **********************************************************************
