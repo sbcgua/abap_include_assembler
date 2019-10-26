@@ -45,11 +45,17 @@ include zinclude_assembler_saver.
 class lcl_main definition final.
   public section.
     types:
-      tt_class_names type standard table of seoclasstx-clsname with default key.
+      begin of ty_deps,
+        depends type seoclasstx-clsname,
+        from type seoclasstx-clsname,
+      end of ty_deps,
+      tt_deps type standard table of ty_deps with default key,
+      tt_class_names type standard table of seoclasstx-clsname with default key,
+      ts_class_names type sorted table of seoclasstx-clsname with unique key table_line.
 
     data:
       m_progname        type sobj_name,
-      m_classes         type tt_class_names,
+      m_classes         type ts_class_names,
       m_disable_marking type abap_bool,
       m_path            type string,
       m_saver           type char1.
@@ -143,17 +149,108 @@ class lcl_main implementation.
 
   method process_clas.
 
+    data lt_deps type tt_deps.
+
+    field-symbols <c> like line of m_classes.
+    field-symbols <dep> like line of lt_deps.
+
+    loop at m_classes assigning <c>.
+
+      data lt_env type senvi_tab.
+      data ls_env_types type envi_types.
+      data lv_name type tadir-obj_name.
+      lv_name = <c>.
+      ls_env_types-clas = abap_true.
+
+      call function 'REPOSITORY_ENVIRONMENT_SET'
+        exporting
+          obj_type       = 'CLAS'
+          object_name    = lv_name
+          environment_types = ls_env_types
+        tables
+          environment    = lt_env
+        exceptions
+          others         = 4.
+
+      field-symbols <env> like line of lt_env.
+      data lv_dep_size type i.
+      lv_dep_size = lines( lt_deps ).
+
+      loop at lt_env assigning <env>.
+        check <env>-type = 'CLAS'.
+        read table m_classes with key table_line = <env>-object transporting no fields.
+        if sy-subrc = 0.
+          append initial line to lt_deps assigning <dep>.
+          <dep>-depends = <c>.
+          <dep>-from    = <env>-object.
+        endif.
+      endloop.
+
+      if lines( lt_deps ) = lv_dep_size. " No dependencies
+        append initial line to lt_deps assigning <dep>.
+        <dep>-depends = <c>.
+      endif.
+
+*      data lt_tadir type if_ris_environment_types=>ty_t_senvi_tadir.
+*      cl_wb_ris_environment=>convert_senvi_to_tadir(
+*        exporting
+*          senvi       = lt_env
+*        importing
+*          senvi_tadir = lt_tadir ).
+
+    endloop.
+
+    " Protection from self cycle
+    sort lt_deps by depends from.
+    loop at lt_deps assigning <dep>.
+      read table lt_deps
+        transporting no fields
+        binary search
+        with key
+          depends = <dep>-from
+          from    = <dep>-depends.
+      if sy-subrc = 0.
+        lcx_error=>raise( 'Class self cycle detected' ).
+      endif.
+    endloop.
+
+    data lt_ordered_classes type tt_class_names.
+    data lt_unordered_classes type tt_class_names.
+    data l_index type i.
+    lt_unordered_classes = m_classes.
+
+    while lines( lt_unordered_classes ) > 0.
+
+      loop at lt_unordered_classes assigning <c>.
+        l_index = sy-tabix.
+        read table lt_deps
+          assigning <dep>
+          binary search
+          with key
+            depends = <c>.
+        assert sy-subrc = 0.
+        if <dep>-from is initial.
+          delete lt_deps index sy-tabix.
+          loop at lt_deps assigning <dep> where from = <c>.
+            clear <dep>-from.
+          endloop.
+          append <c> to lt_ordered_classes.
+          delete lt_unordered_classes index l_index.
+        endif.
+      endloop.
+
+    endwhile.
+
+    " Serialize
+
     data lt_code like rt_codetab.
     data lo_accessor type ref to lcl_extractor_clas.
     create object lo_accessor.
 
+    loop at lt_ordered_classes assigning <c>.
 
-    field-symbols <c> like line of m_classes.
-    loop at m_classes assigning <c>.
-
-      if rt_codetab is not initial and m_disable_marking = abap_false.
+      if rt_codetab is not initial.
         append '' to rt_codetab.
-        append '*INCLUDE ASSEMBLER MARKER' to rt_codetab.
         append '' to rt_codetab.
       endif.
 
@@ -161,6 +258,8 @@ class lcl_main implementation.
       append lines of lt_code to rt_codetab.
 
     endloop.
+
+    " TODO: strip "public" from definition
 
   endmethod.
 
