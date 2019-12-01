@@ -159,12 +159,26 @@ class lcl_main implementation.
       data lt_env type senvi_tab.
       data ls_env_types type envi_types.
       data lv_name type tadir-obj_name.
+      data lv_type type euobj-id.
       lv_name = <c>.
       ls_env_types-clas = abap_true.
 
+      data lo_type type ref to cl_abap_typedescr.
+      lo_type = cl_abap_typedescr=>describe_by_name( lv_name ).
+      if lo_type is not bound.
+        lcx_error=>raise( |Class/intf { lv_name } not found| ).
+      endif.
+      if lo_type->type_kind = lo_type->typekind_class.
+        lv_type = 'CLAS'.
+      elseif lo_type->type_kind = lo_type->typekind_intf.
+        lv_type = 'INTF'.
+      else.
+        lcx_error=>raise( |{ lv_name } has unexpected type kind ({ lo_type->type_kind })| ).
+      endif.
+
       call function 'REPOSITORY_ENVIRONMENT_SET'
         exporting
-          obj_type       = 'CLAS'
+          obj_type       = lv_type
           object_name    = lv_name
           environment_types = ls_env_types
         tables
@@ -173,16 +187,24 @@ class lcl_main implementation.
           others         = 4.
 
       field-symbols <env> like line of lt_env.
+      data lv_search_key type seoclasstx-clsname.
       data lv_dep_size type i.
       lv_dep_size = lines( lt_deps ).
 
       loop at lt_env assigning <env>.
-        check <env>-type = 'CLAS'.
-        read table m_classes with key table_line = <env>-object transporting no fields.
+        check <env>-type = 'CLAS' or <env>-type = 'INTF' or <env>-type = 'OM'.
+        if <env>-type = 'CLAS' or <env>-type = 'INTF'.
+          lv_search_key = <env>-object.
+        elseif <env>-type = 'OM'.
+          lv_search_key = <env>-encl_obj.
+        else.
+          continue.
+        endif.
+        read table m_classes with key table_line = lv_search_key transporting no fields.
         if sy-subrc = 0.
           append initial line to lt_deps assigning <dep>.
           <dep>-depends = <c>.
-          <dep>-from    = <env>-object.
+          <dep>-from    = lv_search_key.
         endif.
       endloop.
 
@@ -202,6 +224,7 @@ class lcl_main implementation.
 
     " Protection from self cycle
     sort lt_deps by depends from.
+    delete adjacent duplicates from lt_deps.
     loop at lt_deps assigning <dep>.
       read table lt_deps
         transporting no fields
@@ -324,9 +347,9 @@ tables: seoclasstx.
 
 selection-screen begin of block b1 with frame title txt_b1.
 
-parameter p_prog type programm default 'ZIS_EXAMPLE'.
+parameters p_prog type programm default 'ZIS_EXAMPLE'.
 select-options s_class for seoclasstx-clsname.
-parameter p_womark type xfeld.
+parameters p_womark type xfeld.
 
 selection-screen end of block b1.
 
@@ -334,22 +357,22 @@ selection-screen begin of block b2 with frame title txt_b2.
 
 selection-screen begin of line.
 selection-screen comment (24) txt_disp  for field p_disp.
-parameter p_disp   type char1 radiobutton group r1 default 'X'.
+parameters p_disp   type char1 radiobutton group r1 default 'X'.
 selection-screen end of line.
 
 selection-screen begin of line.
 selection-screen comment (24) txt_file  for field p_file.
-parameter p_file type char1 radiobutton group r1.
+parameters p_file type char1 radiobutton group r1.
 selection-screen end of line.
 
 selection-screen begin of line.
 selection-screen comment (24) txt_code  for field p_code.
-parameter p_code type char1 radiobutton group r1.
+parameters p_code type char1 radiobutton group r1.
 selection-screen end of line.
 
 selection-screen begin of line.
 selection-screen comment (24) txt_path  for field p_path  modif id pth.
-parameter p_path type char255                             modif id pth.
+parameters p_path type char255                            modif id pth.
 selection-screen end of line.
 
 selection-screen end of block b2.
