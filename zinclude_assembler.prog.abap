@@ -135,7 +135,6 @@ class lcl_main implementation.
 
     list_includes( lo_progcode ).
 
-    data lt_codetab   type string_table.
     data lo_assembler type ref to lcl_assembler.
     data ls_params    type lcl_assembler=>ty_params.
 
