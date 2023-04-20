@@ -278,8 +278,6 @@ class lcl_main implementation.
 
     endloop.
 
-    " TODO: strip "public" from definition
-
   endmethod.
 
   method list_includes.
@@ -321,7 +319,7 @@ class lcl_main implementation.
     endcase.
 
     li_saver->save(
-      i_path = l_path
+      i_path    = l_path
       i_codetab = it_codetab ).
 
     case m_saver.
@@ -388,30 +386,35 @@ initialization.
 **********************************************************************
 * ENTRY POINT
 **********************************************************************
-start-of-selection.
+form main.
 
-  data go_main type ref to lcl_main.
-  data g_saver type char1.
-  data gt_class_list type lcl_main=>tt_class_names.
+  data lo_app type ref to lcl_main.
+  data lv_saver_type type c length 1.
+  data lt_class_list type lcl_main=>tt_class_names.
 
   case 'X'.
     when p_disp.
-      g_saver = 'D'.
+      lv_saver_type = 'D'.
     when p_file.
-      g_saver = 'F'.
+      lv_saver_type = 'F'.
     when p_code.
-      g_saver = 'C'.
+      lv_saver_type = 'C'.
   endcase.
 
   select clsname from seoclasstx
-    into table gt_class_list
+    into table lt_class_list
     where clsname in s_class.
 
-  create object go_main
+  create object lo_app
     exporting
       i_progname        = p_prog
-      i_classes         = gt_class_list
+      i_classes         = lt_class_list
       i_disable_marking = p_womark
       i_path            = |{ p_path }|
-      i_saver           = g_saver.
-  go_main->run( ).
+      i_saver           = lv_saver_type.
+  lo_app->run( ).
+
+endform.
+
+start-of-selection.
+  perform main.
