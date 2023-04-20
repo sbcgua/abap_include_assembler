@@ -17,19 +17,19 @@ class lcl_code_object definition create private final.
 
     class-methods load
       importing
-        io_accessor type ref to lif_devobj_accessor
+        io_accessor type ref to zif_iasm_devobj_accessor
         i_progname  type sobj_name
       returning
         value(ro_obj) type ref to lcl_code_object
       raising
-        lcx_error.
+        zcx_iasm_error.
 endclass.
 
 
 class lcl_code_object implementation.
   method load.
     data lo         type ref to lcl_code_object.
-    data lo_ex      type ref to lcx_error.
+    data lo_ex      type ref to zcx_iasm_error.
     data l_line     like line of lo->at_codetab.
     data l_incname  type sobj_name.
     data ls_include type ty_include.
@@ -50,7 +50,7 @@ class lcl_code_object implementation.
       if l_incname is not initial.
         try.
           ls_include-obj  = load( io_accessor = io_accessor i_progname = l_incname ).
-        catch lcx_error into lo_ex.
+        catch zcx_iasm_error into lo_ex.
           lo_ex->msg = lo_ex->msg && `; ` && i_progname && '@' && |{ ls_include-lnum }|.
           raise exception lo_ex.
         endtry.
@@ -74,7 +74,7 @@ class ltcl_code_object_test definition final
   risk level harmless.
 
   private section.
-    methods load for testing raising lcx_error.
+    methods load for testing raising zcx_iasm_error.
 endclass.
 
 class ltcl_code_object_test implementation.
@@ -92,7 +92,7 @@ class ltcl_code_object_test implementation.
       act = lo_obj->a_devclass
       exp = 'XTEST' ).
     cl_abap_unit_assert=>assert_equals(
-      exp = lo_acc->lif_devobj_accessor~get_code( 'XTESTPROG' )
+      exp = lo_acc->zif_iasm_devobj_accessor~get_code( 'XTESTPROG' )
       act = lo_obj->at_codetab ).
 
     data ls_include type lcl_code_object=>ty_include.
@@ -106,7 +106,7 @@ class ltcl_code_object_test implementation.
       act = ls_include-lnum
       exp = 2 ).
     cl_abap_unit_assert=>assert_equals(
-      exp = lo_acc->lif_devobj_accessor~get_code( 'XTESTPROG_TOP' )
+      exp = lo_acc->zif_iasm_devobj_accessor~get_code( 'XTESTPROG_TOP' )
       act = ls_include-obj->at_codetab ).
 
     read table lo_obj->at_includes into ls_include index 2.
@@ -119,7 +119,7 @@ class ltcl_code_object_test implementation.
       act = ls_include-lnum
       exp = 3 ).
     cl_abap_unit_assert=>assert_equals(
-      exp = lo_acc->lif_devobj_accessor~get_code( 'XTESTPROG_F01' )
+      exp = lo_acc->zif_iasm_devobj_accessor~get_code( 'XTESTPROG_F01' )
       act = ls_include-obj->at_codetab ).
 
     read table lo_obj->at_includes into ls_include index 3.

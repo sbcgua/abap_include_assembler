@@ -5,11 +5,11 @@
 * SAVE TO DISPLAY -> SHOW
 class lcl_saver_to_display definition final.
   public section.
-    interfaces lif_devobj_saver.
+    interfaces zif_iasm_devobj_saver.
 endclass.
 
 class lcl_saver_to_display implementation.
-  method lif_devobj_saver~save.
+  method zif_iasm_devobj_saver~save.
     cl_demo_output=>display( i_codetab ).
   endmethod.
 endclass.
@@ -17,17 +17,17 @@ endclass.
 * SAVE TO PROGRAM
 class lcl_saver_to_program definition final.
   public section.
-    interfaces lif_devobj_saver.
+    interfaces zif_iasm_devobj_saver.
 endclass.
 
 class lcl_saver_to_program implementation.
-  method lif_devobj_saver~save.
+  method zif_iasm_devobj_saver~save.
     if strlen( i_path ) > 40.
-      lcx_error=>raise( 'Program name must be <= 40 symbols' ). "#EC NOTEXT
+      zcx_iasm_error=>raise( 'Program name must be <= 40 symbols' ). "#EC NOTEXT
     endif.
 
     if i_path is initial.
-      lcx_error=>raise( 'Target program name is empty' ).       "#EC NOTEXT
+      zcx_iasm_error=>raise( 'Target program name is empty' ).       "#EC NOTEXT
     endif.
 
     data l_progname type reposrc-progname.
@@ -35,7 +35,7 @@ class lcl_saver_to_program implementation.
       where progname = i_path.
 
     if sy-subrc is not initial.
-      lcx_error=>raise( |Target program { i_path } must be created manually first| ). "#EC NOTEXT
+      zcx_iasm_error=>raise( |Target program { i_path } must be created manually first| ). "#EC NOTEXT
     endif.
 
     data lt_codetab type abaptxt255_tab.
@@ -60,9 +60,9 @@ class lcl_saver_to_program implementation.
 
     IF sy-subrc is not initial.
       if sy-msgid = 'EU' and sy-msgno = '510'.
-        lcx_error=>raise( |Target program { i_path } is being edited by someone else| ). "#EC NOTEXT
+        zcx_iasm_error=>raise( |Target program { i_path } is being edited by someone else| ). "#EC NOTEXT
       else.
-        lcx_error=>raise( |Cannot update program { i_path }| ). "#EC NOTEXT
+        zcx_iasm_error=>raise( |Cannot update program { i_path }| ). "#EC NOTEXT
       endif.
     endif.
 
@@ -72,16 +72,16 @@ endclass.
 * SAVE TO FILE
 class lcl_saver_to_file definition final.
   public section.
-    interfaces lif_devobj_saver.
+    interfaces zif_iasm_devobj_saver.
 endclass.
 
 class lcl_saver_to_file implementation.
-  method lif_devobj_saver~save.
+  method zif_iasm_devobj_saver~save.
     data l_length type i.
     data lt_data  type xml_rawdata.
 
     if i_path is initial.
-      lcx_error=>raise( 'Path is empty' ).             "#EC NOTEXT
+      zcx_iasm_error=>raise( 'Path is empty' ).             "#EC NOTEXT
     endif.
 
     data lt_codetab type abaptxt255_tab.
@@ -103,7 +103,7 @@ class lcl_saver_to_file implementation.
       exceptions failed        = 1.
 
     if sy-subrc is not initial.
-      lcx_error=>raise( 'Cannot convert to binary' ).  "#EC NOTEXT
+      zcx_iasm_error=>raise( 'Cannot convert to binary' ).  "#EC NOTEXT
     endif.
 
     call method cl_gui_frontend_services=>gui_download
@@ -140,7 +140,7 @@ class lcl_saver_to_file implementation.
         others                  = 24.
 
     if sy-subrc is not initial.
-      lcx_error=>raise( |Cannot save file ({ sy-subrc })| ). "#EC NOTEXT
+      zcx_iasm_error=>raise( |Cannot save file ({ sy-subrc })| ). "#EC NOTEXT
     endif.
 
   endmethod.

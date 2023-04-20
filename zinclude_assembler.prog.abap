@@ -30,13 +30,10 @@
 
 report zinclude_assembler.
 
-include zinclude_assembler_errors.
-include zinclude_assembler_interfaces.
 include zinclude_assembler_extractors.
 include zinclude_assembler_matchers.
 include zinclude_assembler_code_obj.
 include zinclude_assembler_assembler.
-include zinclude_assembler_saver.
 
 
 **********************************************************************
@@ -77,17 +74,17 @@ class lcl_main definition final.
     methods save
       importing
         it_codetab        type string_table
-      raising lcx_error.
+      raising zcx_iasm_error.
 
     methods process_prog
       returning
         value(rt_codetab) type string_table
-      raising lcx_error.
+      raising zcx_iasm_error.
 
     methods process_clas
       returning
         value(rt_codetab) type string_table
-      raising lcx_error.
+      raising zcx_iasm_error.
 
 endclass.
 
@@ -102,7 +99,7 @@ class lcl_main implementation.
   endmethod.
 
   method run.
-    data lo_ex  type ref to lcx_error.
+    data lo_ex  type ref to zcx_iasm_error.
     data lt_codetab type string_table.
 
     try.
@@ -112,11 +109,11 @@ class lcl_main implementation.
       elseif m_classes is not initial.
         lt_codetab = process_clas( ).
       else.
-        lcx_error=>raise( 'No source specified' ).
+        zcx_iasm_error=>raise( 'No source specified' ).
       endif.
       skip. uline.
       save( lt_codetab ).
-    catch lcx_error into lo_ex.
+    catch zcx_iasm_error into lo_ex.
       write: / lo_ex->msg.
       return.
     endtry.
@@ -165,14 +162,14 @@ class lcl_main implementation.
       data lo_type type ref to cl_abap_typedescr.
       lo_type = cl_abap_typedescr=>describe_by_name( lv_name ).
       if lo_type is not bound.
-        lcx_error=>raise( |Class/intf { lv_name } not found| ).
+        zcx_iasm_error=>raise( |Class/intf { lv_name } not found| ).
       endif.
       if lo_type->type_kind = lo_type->typekind_class.
         lv_type = 'CLAS'.
       elseif lo_type->type_kind = lo_type->typekind_intf.
         lv_type = 'INTF'.
       else.
-        lcx_error=>raise( |{ lv_name } has unexpected type kind ({ lo_type->type_kind })| ).
+        zcx_iasm_error=>raise( |{ lv_name } has unexpected type kind ({ lo_type->type_kind })| ).
       endif.
 
       call function 'REPOSITORY_ENVIRONMENT_SET'
@@ -232,7 +229,7 @@ class lcl_main implementation.
           depends = <dep>-from
           from    = <dep>-depends.
       if sy-subrc = 0.
-        lcx_error=>raise( 'Class self cycle detected' ).
+        zcx_iasm_error=>raise( 'Class self cycle detected' ).
       endif.
     endloop.
 
@@ -276,7 +273,7 @@ class lcl_main implementation.
         append '' to rt_codetab.
       endif.
 
-      lt_code = lo_accessor->lif_devobj_accessor~get_code( |{ <c> }| ).
+      lt_code = lo_accessor->zif_iasm_devobj_accessor~get_code( |{ <c> }| ).
       append lines of lt_code to rt_codetab.
 
     endloop.
@@ -299,16 +296,16 @@ class lcl_main implementation.
 
   method save.
 
-    data lo_saver type ref to lif_devobj_saver.
+    data li_saver type ref to zif_iasm_devobj_saver.
     data l_path type string.
 
     l_path = m_path.
     case m_saver.
       when 'D'.
-        create object lo_saver type lcl_saver_to_display.
+        li_saver = zcl_iasm_devobj_savers=>to_display( ).
 
       when 'F'.
-        create object lo_saver type lcl_saver_to_file.
+        li_saver = zcl_iasm_devobj_savers=>to_file( ).
 
         data len type i.
         len = strlen( l_path ) - 1.
@@ -317,13 +314,13 @@ class lcl_main implementation.
         endif.
 
       when 'C'.
-        create object lo_saver type lcl_saver_to_program.
+        li_saver = zcl_iasm_devobj_savers=>to_program( ).
 
       when others.
-        lcx_error=>raise( 'ERROR: unknown saver' ). "#EC NOTEXT
+        zcx_iasm_error=>raise( 'ERROR: unknown saver' ). "#EC NOTEXT
     endcase.
 
-    lo_saver->save(
+    li_saver->save(
       i_path = l_path
       i_codetab = it_codetab ).
 

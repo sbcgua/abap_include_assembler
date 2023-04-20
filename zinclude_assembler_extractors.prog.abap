@@ -4,12 +4,12 @@
 
 class lcl_extractor_prog definition final.
   public section.
-    interfaces lif_devobj_accessor.
+    interfaces zif_iasm_devobj_accessor.
 endclass.
 
 class lcl_extractor_prog implementation.
 
-  method lif_devobj_accessor~get_code.
+  method zif_iasm_devobj_accessor~get_code.
     data l_status type c.
 
     call function 'CHECK_EXIST'
@@ -23,7 +23,7 @@ class lcl_extractor_prog implementation.
         others     = 1.
 
     if sy-subrc <> 0 or l_status <> 'X'. " Exist and active
-      lcx_error=>raise( |check_exist { i_progname }| ).  "#EC NOTEXT
+      zcx_iasm_error=>raise( |check_exist { i_progname }| ).  "#EC NOTEXT
     endif.
 
     data ls_tadir type tadir.
@@ -34,7 +34,7 @@ class lcl_extractor_prog implementation.
       and   obj_name = i_progname.
 
     if sy-subrc <> 0.
-      lcx_error=>raise( |select tadir { i_progname }| ).  "#EC NOTEXT
+      zcx_iasm_error=>raise( |select tadir { i_progname }| ).  "#EC NOTEXT
     endif.
 
     data lt_codetab type abaptxt255_tab.
@@ -51,7 +51,7 @@ class lcl_extractor_prog implementation.
         permission_error = 3
         others           = 4.
     if sy-subrc is not initial.
-      lcx_error=>raise( |Cannot read program| ).  "#EC NOTEXT
+      zcx_iasm_error=>raise( |Cannot read program| ).  "#EC NOTEXT
     endif.
 
     field-symbols <c> like line of lt_codetab.
@@ -59,9 +59,9 @@ class lcl_extractor_prog implementation.
       append <c>-line to r_codetab.
     endloop.
 
-  endmethod. "lif_devobj_accessor~get_prog_code
+  endmethod. "zif_iasm_devobj_accessor~get_prog_code
 
-  method lif_devobj_accessor~get_devc.
+  method zif_iasm_devobj_accessor~get_devc.
 
     select single devclass into r_devc
       from tadir
@@ -70,21 +70,21 @@ class lcl_extractor_prog implementation.
       and   obj_name = i_progname.
 
     if sy-subrc <> 0.
-      lcx_error=>raise( |Cannot find devclass { i_progname }| ).  "#EC NOTEXT
+      zcx_iasm_error=>raise( |Cannot find devclass { i_progname }| ).  "#EC NOTEXT
     endif.
 
-  endmethod. "lif_devobj_accessor~get_prog_devc
+  endmethod. "zif_iasm_devobj_accessor~get_prog_devc
 
 endclass.
 
 class lcl_extractor_clas definition final.
   public section.
-    interfaces lif_devobj_accessor.
+    interfaces zif_iasm_devobj_accessor.
 endclass.
 
 class lcl_extractor_clas implementation.
 
-  method lif_devobj_accessor~get_code.
+  method zif_iasm_devobj_accessor~get_code.
 
     data lo_factory type ref to cl_oo_factory.
     lo_factory = cl_oo_factory=>create_instance( ).
@@ -99,9 +99,9 @@ class lcl_extractor_clas implementation.
 
     r_codetab = lt_source.
 
-  endmethod. "lif_devobj_accessor~get_prog_code
+  endmethod. "zif_iasm_devobj_accessor~get_prog_code
 
-  method lif_devobj_accessor~get_devc.
+  method zif_iasm_devobj_accessor~get_devc.
 
     select single devclass into r_devc
       from tadir
@@ -110,10 +110,10 @@ class lcl_extractor_clas implementation.
       and   obj_name = i_progname.
 
     if sy-subrc <> 0.
-      lcx_error=>raise( |Cannot find devclass { i_progname }| ).  "#EC NOTEXT
+      zcx_iasm_error=>raise( |Cannot find devclass { i_progname }| ).  "#EC NOTEXT
     endif.
 
-  endmethod. "lif_devobj_accessor~get_prog_devc
+  endmethod. "zif_iasm_devobj_accessor~get_prog_devc
 
 endclass.
 
@@ -134,7 +134,7 @@ endclass.
 
 class ltcl_extractor_test implementation.
   method get_prog_code.
-    data lo_if   type ref to lif_devobj_accessor.
+    data lo_if   type ref to zif_iasm_devobj_accessor.
     data lo_obj  type ref to lcl_extractor_prog.
     data lt_code type string_table.
 
@@ -144,7 +144,7 @@ class ltcl_extractor_test implementation.
     try.
       clear sy-subrc.
       lt_code = lo_if->get_code( i_progname = '~~DOES~NOT~EXIST~~' ).
-    catch lcx_error.
+    catch zcx_iasm_error.
       sy-subrc = 1.
     endtry.
 
@@ -153,7 +153,7 @@ class ltcl_extractor_test implementation.
     try.
       clear sy-subrc.
       lt_code = lo_if->get_code( i_progname = sy-cprog ).
-    catch lcx_error.
+    catch zcx_iasm_error.
       sy-subrc = 1.
     endtry.
 
@@ -169,12 +169,12 @@ endclass.
 
 class ltcl_dummy_extractor definition final.
   public section.
-    interfaces lif_devobj_accessor.
+    interfaces zif_iasm_devobj_accessor.
 endclass.
 
 class ltcl_dummy_extractor implementation.
 
-  method lif_devobj_accessor~get_code.
+  method zif_iasm_devobj_accessor~get_code.
     data lt_code like r_codetab.
     data l_line  like line of lt_code.
 
@@ -225,14 +225,14 @@ class ltcl_dummy_extractor implementation.
         append_codeline 'start-of-selection.'.            "#EC NOTEXT
         append_codeline '  perform perform_write.'.       "#EC NOTEXT
       when others.
-        lcx_error=>raise( |test get { i_progname }| ).
+        zcx_iasm_error=>raise( |test get { i_progname }| ).
     endcase.
 
     r_codetab = lt_code.
 
   endmethod. "lcl_dummy_extractor~get_prog_code
 
-  method lif_devobj_accessor~get_devc.
+  method zif_iasm_devobj_accessor~get_devc.
 
     case i_progname.
       when 'XTESTPROG'.

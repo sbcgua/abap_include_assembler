@@ -122,7 +122,7 @@ class ltcl_assembler_test definition final
   risk level harmless.
 
   private section.
-    methods assemble for testing raising lcx_error.
+    methods assemble for testing raising zcx_iasm_error.
 endclass.
 
 class ltcl_assembler_test implementation.
@@ -133,7 +133,7 @@ class ltcl_assembler_test implementation.
 
     create object lo_acc.
     lo_prog = lcl_code_object=>load( io_accessor = lo_acc i_progname = 'XTESTPROG' ).
-    lt_exp  = lo_acc->lif_devobj_accessor~get_code( 'ASSEMBLED_RESULT' ).
+    lt_exp  = lo_acc->zif_iasm_devobj_accessor~get_code( 'ASSEMBLED_RESULT' ).
 
     data lo_assembler type ref to lcl_assembler.
     create object lo_assembler exporting io_prog = lo_prog.
