@@ -18,7 +18,7 @@
 
 A tool to statically include includes, interfaces and classes into the main program. Can be useful to publish easy-to-install single-file code while still enjoying nice code structure in dev environment.
 
-![illustration1](illustration_small.png)
+![illustration1](img/illustration_small.png)
 
 You develop your program with as many includes/classes as you want. Then run the include assembler and it builds you a single-file program which you publish then.
 
