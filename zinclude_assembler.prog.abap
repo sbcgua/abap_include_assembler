@@ -265,12 +265,20 @@ class lcl_main implementation.
 
     data lt_code like rt_codetab.
     data lo_accessor type ref to lcl_extractor_clas.
+    data lv_marker type string.
+
     create object lo_accessor.
 
     loop at lt_ordered_classes assigning <c>.
 
       if rt_codetab is not initial.
         append '' to rt_codetab.
+        append '' to rt_codetab.
+      endif.
+
+      if m_disable_marking = abap_false.
+        lv_marker = |*%%INCLUDING { <c> }|.
+        append lv_marker to rt_codetab.
         append '' to rt_codetab.
       endif.
 
