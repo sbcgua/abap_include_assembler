@@ -59,7 +59,7 @@ class lcl_extractor_prog implementation.
       append <c>-line to r_codetab.
     endloop.
 
-  endmethod. "zif_iasm_devobj_accessor~get_prog_code
+  endmethod.
 
   method zif_iasm_devobj_accessor~get_devc.
 
@@ -73,13 +73,22 @@ class lcl_extractor_prog implementation.
       zcx_iasm_error=>raise( |Cannot find devclass { i_progname }| ).  "#EC NOTEXT
     endif.
 
-  endmethod. "zif_iasm_devobj_accessor~get_prog_devc
+  endmethod.
 
 endclass.
 
 class lcl_extractor_clas definition final.
   public section.
     interfaces zif_iasm_devobj_accessor.
+
+    methods strip_public " public to be testable, improve
+      changing
+        ct_source type string_table
+      raising
+        zcx_iasm_error.
+
+  private section.
+    data mv_obj_name type string.
 endclass.
 
 class lcl_extractor_clas implementation.
@@ -87,19 +96,61 @@ class lcl_extractor_clas implementation.
   method zif_iasm_devobj_accessor~get_code.
 
     data lo_factory type ref to cl_oo_factory.
-    lo_factory = cl_oo_factory=>create_instance( ).
-
     data lo_source type ref to if_oo_clif_source.
+
+    mv_obj_name = i_progname.
+    lo_factory = cl_oo_factory=>create_instance( ).
     lo_source = lo_factory->create_clif_source(
       clif_name = i_progname
-      version = 'A' ).
+      version   = 'A' ).
 
     data lt_source type string_table.
     lo_source->get_source( importing source = lt_source ).
+    strip_public( changing ct_source = lt_source ).
 
     r_codetab = lt_source.
 
-  endmethod. "zif_iasm_devobj_accessor~get_prog_code
+  endmethod.
+
+  method strip_public.
+
+    data lv_in_definition type abap_bool.
+    data lv_idx type i.
+    field-symbols <s> like line of ct_source.
+
+    " Simplified stripper
+    " expects public in a separate line, create public should not be splitted as well
+
+    loop at ct_source assigning <s>.
+      lv_idx = sy-tabix.
+
+      if lv_in_definition = abap_false.
+        if find( val = <s> regex = '^\s*class\s+\w+\s+definition' case = abap_false ) = -1 and
+          find( val = <s> regex = '^\s*interface\s+\w+' case = abap_false ) = -1.
+          continue.
+        endif.
+        lv_in_definition = abap_true.
+      else.
+        if find( val = <s> regex = '^\s*public(\.|\s|$)' case = abap_false ) <> -1.
+          <s> = replace( val = <s> sub = 'public' case = abap_false with = '' ).
+          if <s> co ` ` or <s> is initial.
+            delete ct_source index lv_idx.
+          endif.
+          lv_in_definition = abap_false.
+          exit. " no more publics
+        elseif <s> ca '.'.
+          lv_in_definition = abap_false.
+          exit. " no more publics
+        endif.
+      endif.
+
+    endloop.
+
+    if lv_in_definition = abap_true.
+      zcx_iasm_error=>raise( |Public stripper: could not detect definition bounds in { mv_obj_name }| ) .
+    endif.
+
+  endmethod.
 
   method zif_iasm_devobj_accessor~get_devc.
 
@@ -113,7 +164,7 @@ class lcl_extractor_clas implementation.
       zcx_iasm_error=>raise( |Cannot find devclass { i_progname }| ).  "#EC NOTEXT
     endif.
 
-  endmethod. "zif_iasm_devobj_accessor~get_prog_devc
+  endmethod.
 
 endclass.
 
@@ -162,6 +213,61 @@ class ltcl_extractor_test implementation.
 
   endmethod.
 endclass.
+
+**********************************************************************
+* TEST stripper
+**********************************************************************
+
+class ltcl_strip_public definition for testing risk level harmless duration short.
+  public section.
+    methods test_clas_strip for testing raising zcx_iasm_error.
+    methods test_intf_strip for testing raising zcx_iasm_error.
+endclass.
+class ltcl_strip_public implementation.
+  method test_clas_strip.
+    data lo type ref to lcl_extractor_clas.
+    data lt_act type string_table.
+    data lt_exp type string_table.
+
+    create object lo.
+
+    append ' class ZCL_XXX DEFINITION inheriting from YYY' to lt_act.
+    append '  public' to lt_act.
+    append '  create public ' to lt_act.
+    append '  .' to lt_act.
+    lt_exp = lt_act.
+    delete lt_exp index 2.
+
+    lo->strip_public( changing ct_source = lt_act ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = lt_act
+      exp = lt_exp ).
+
+  endmethod.
+
+  method test_intf_strip.
+    data lo type ref to lcl_extractor_clas.
+    data lt_act type string_table.
+    data lt_exp type string_table.
+
+    create object lo.
+
+    append ' interface ZIF_XXX' to lt_act.
+    append '  public .' to lt_act.
+    lt_exp = lt_act.
+    delete lt_exp index 2.
+    append '   .' to lt_exp.
+
+    lo->strip_public( changing ct_source = lt_act ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = lt_act
+      exp = lt_exp ).
+
+  endmethod.
+endclass.
+
 
 **********************************************************************
 * INTERFACE IMPLEMENTATION FOR DUMMY EXTRACTION - tests and example
@@ -230,7 +336,7 @@ class ltcl_dummy_extractor implementation.
 
     r_codetab = lt_code.
 
-  endmethod. "lcl_dummy_extractor~get_prog_code
+  endmethod.
 
   method zif_iasm_devobj_accessor~get_devc.
 
@@ -247,6 +353,6 @@ class ltcl_dummy_extractor implementation.
         r_devc = 'XTEST_EXT'.
     endcase.
 
-  endmethod. "lcl_dummy_extractor~get_prog_devc
+  endmethod.
 
 endclass.
