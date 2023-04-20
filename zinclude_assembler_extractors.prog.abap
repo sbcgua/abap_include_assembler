@@ -95,20 +95,18 @@ class lcl_extractor_clas implementation.
 
   method zif_iasm_devobj_accessor~get_code.
 
-    data lo_factory type ref to cl_oo_factory.
-    data lo_source type ref to if_oo_clif_source.
+    data lt_source_part type string_table.
+    data ls_class_key type seoclskey.
+    data lo_serializer type ref to zcl_abapgit_oo_serializer.
 
-    mv_obj_name = i_progname.
-    lo_factory = cl_oo_factory=>create_instance( ).
-    lo_source = lo_factory->create_clif_source(
-      clif_name = i_progname
-      version   = 'A' ).
+    create object lo_serializer.
 
-    data lt_source type string_table.
-    lo_source->get_source( importing source = lt_source ).
-    strip_public( changing ct_source = lt_source ).
+    ls_class_key-clsname = i_progname.
 
-    r_codetab = lt_source.
+    lt_source_part = lo_serializer->serialize_abap_clif_source( ls_class_key ).
+    strip_public( changing ct_source = lt_source_part ).
+
+    append lines of lt_source_part to r_codetab.
 
   endmethod.
 

@@ -30,6 +30,7 @@
 
 report zinclude_assembler.
 
+include zinclude_assembler_ag_contrib.
 include zinclude_assembler_extractors.
 include zinclude_assembler_matchers.
 include zinclude_assembler_code_obj.
