@@ -24,7 +24,7 @@ You develop your program with as many includes/classes as you want. Then run the
 
 The result can be saved to a file or to **another program** or just shown on screen. "Another program" remains inactive after update. Only includes from the same dev-package as the main program are assembled.
 
-The tool also support classes and interfaces (with local definitions/implementations and macros). You can specify multiple of those, the order or serialization will be automatically detected (dependency related).
+The tool also supports **classes and interfaces** (with local definitions/implementations and macros). You can specify multiple of those. The order or serialization will be automatically detected (dependency related).
 
 ![illustration2](img/sel_screen.png)
 
@@ -32,16 +32,7 @@ The tool also support classes and interfaces (with local definitions/implementat
 
 Installed with [AbapGit](https://github.com/abapGit/abapGit).
 
-## License
+## License and attribution
 
 - The code is licensed under MIT License. Please see [LICENSE](/LICENSE) for details.
 - The code reuses fragments of [abapGit](https://github.com/abapGit/abapGit) code
-
-## Technical design and reuse possibilities
-
-Internal structure is designed so that it can be **integrated in another software as a middleware** (for those who might be interested).
-
-Briefly, you call `lcl_code_object=>load()` with a program name to assemble. This creates a memory copy of program code with all includes as a deep list. Then you create `lcl_assembler` instance with a reference to the above code object and call `assemble()` - it returns `abaptxt255` table with the assembled code. See `lcl_main-run()` for code example.
-
-Integration aspect: `lcl_code_object=>load()` also requires an instance of `lif_devobj_accessor` - an interface implementation that supplies program code by it's name. In the include_assembler it is implemented in `lcl_extractor` class - it actually reads program code from system. But you are free to implement your own class with another approach (e.g. of your code already has extraction logic). Example can be seen in `lcl_dummy_extractor` - the dummy class used for testing, it doesn't read objects from system but generates them.
-
