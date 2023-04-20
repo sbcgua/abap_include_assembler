@@ -89,6 +89,11 @@ class lcl_extractor_clas definition final.
 
   private section.
     data mv_obj_name type string.
+    methods get_obj_type
+      importing
+        iv_obj type tadir-obj_name
+      returning
+        value(rv_type) type tadir-object.
 endclass.
 
 class lcl_extractor_clas implementation.
@@ -102,6 +107,23 @@ class lcl_extractor_clas implementation.
     create object lo_serializer.
 
     ls_class_key-clsname = i_progname.
+
+    if get_obj_type( i_progname ) = 'CLAS'.
+      lt_source_part = lo_serializer->serialize_macros( ls_class_key ).
+      if lt_source_part is not initial.
+        append lines of lt_source_part to r_codetab.
+      endif.
+
+      lt_source_part = lo_serializer->serialize_locals_def( ls_class_key ).
+      if lt_source_part is not initial.
+        append lines of lt_source_part to r_codetab.
+      endif.
+
+      lt_source_part = lo_serializer->serialize_locals_imp( ls_class_key ).
+      if lt_source_part is not initial.
+        append lines of lt_source_part to r_codetab.
+      endif.
+    endif.
 
     lt_source_part = lo_serializer->serialize_abap_clif_source( ls_class_key ).
     strip_public( changing ct_source = lt_source_part ).
@@ -150,12 +172,22 @@ class lcl_extractor_clas implementation.
 
   endmethod.
 
+  method get_obj_type.
+
+    select single object into rv_type
+      from tadir
+      where pgmid    = 'R3TR'
+      and   ( object = 'CLAS' or object = 'INTF' )
+      and   obj_name = iv_obj.
+
+  endmethod.
+
   method zif_iasm_devobj_accessor~get_devc.
 
     select single devclass into r_devc
       from tadir
       where pgmid    = 'R3TR'
-      and   object   = 'CLAS'
+      and   ( object = 'CLAS' or object = 'INTF' )
       and   obj_name = i_progname.
 
     if sy-subrc <> 0.
