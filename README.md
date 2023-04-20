@@ -28,6 +28,8 @@ The tool also supports **classes and interfaces** (with local definitions/implem
 
 ![illustration2](img/sel_screen.png)
 
+Examples of assembled code can be seen [here (for includes)](src/examples/zis_example_assembled.prog.abap) and [here (for OO)](src/examples/zis_example_clas_assembled.prog.abap).
+
 ## Installation
 
 Installed with [AbapGit](https://github.com/abapGit/abapGit).
