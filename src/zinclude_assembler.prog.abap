@@ -47,11 +47,18 @@ class lcl_main definition final.
         depends type seoclasstx-clsname,
         from type seoclasstx-clsname,
       end of ty_deps,
+
+      begin of ty_rename,
+        from type seoclasstx-clsname,
+        to type seoclasstx-clsname,
+      end of ty_rename,
+
       tt_deps type standard table of ty_deps with default key,
       tt_class_names type standard table of seoclasstx-clsname with default key,
       ts_class_names type sorted table of seoclasstx-clsname with unique key table_line.
 
     data:
+      m_renames         type sorted table of ty_rename with unique key from,
       m_progname        type sobj_name,
       m_classes         type ts_class_names,
       m_disable_marking type abap_bool,
@@ -64,7 +71,9 @@ class lcl_main definition final.
         i_classes         type tt_class_names
         i_disable_marking type abap_bool
         i_path            type string
-        i_saver           type char1.
+        i_saver           type char1
+        i_rename_from     type seoclasstx-clsname
+        i_rename_to       type seoclasstx-clsname.
 
     methods run.
 
@@ -87,6 +96,18 @@ class lcl_main definition final.
         value(rt_codetab) type string_table
       raising zcx_iasm_error.
 
+    methods apply_renames
+      changing
+        value(ct_codetab) type string_table.
+
+    class-methods order_classes_by_dep
+      importing
+        i_classes type ts_class_names
+      returning
+        value(r_ordered_classes) type tt_class_names
+      raising
+        zcx_iasm_error.
+
 endclass.
 
 class lcl_main implementation.
@@ -97,6 +118,17 @@ class lcl_main implementation.
     m_disable_marking = i_disable_marking.
     m_path            = i_path.
     m_saver           = i_saver.
+
+    if i_rename_from is not initial and i_rename_to is not initial.
+      field-symbols <i> like line of m_classes.
+      data r like line of m_renames.
+      loop at m_classes assigning <i>.
+        r-from = to_lower( <i> ).
+        r-to   = to_lower( replace( val = <i> sub = i_rename_from with = i_rename_to ) ).
+        insert r into table m_renames.
+      endloop.
+    endif.
+
   endmethod.
 
   method run.
@@ -144,14 +176,14 @@ class lcl_main implementation.
 
   endmethod.
 
-  method process_clas.
+  method order_classes_by_dep.
 
     data lt_deps type tt_deps.
 
     field-symbols <c> like line of m_classes.
     field-symbols <dep> like line of lt_deps.
 
-    loop at m_classes assigning <c>.
+    loop at i_classes assigning <c>.
 
       data lt_env type senvi_tab.
       data ls_env_types type envi_types.
@@ -197,7 +229,7 @@ class lcl_main implementation.
         else.
           continue.
         endif.
-        read table m_classes with key table_line = lv_search_key transporting no fields.
+        read table i_classes with key table_line = lv_search_key transporting no fields. " Sorted ?
         if sy-subrc = 0.
           append initial line to lt_deps assigning <dep>.
           <dep>-depends = <c>.
@@ -230,14 +262,13 @@ class lcl_main implementation.
           depends = <dep>-from
           from    = <dep>-depends.
       if sy-subrc = 0.
-        zcx_iasm_error=>raise( 'Class self cycle detected' ).
+        zcx_iasm_error=>raise( |Class self cycle detected: { <dep>-from } on { <dep>-depends }| ).
       endif.
     endloop.
 
-    data lt_ordered_classes type tt_class_names.
     data lt_unordered_classes type tt_class_names.
     data l_index type i.
-    lt_unordered_classes = m_classes.
+    lt_unordered_classes = i_classes.
 
     while lines( lt_unordered_classes ) > 0.
 
@@ -254,18 +285,31 @@ class lcl_main implementation.
           loop at lt_deps assigning <dep> where from = <c>.
             clear <dep>-from.
           endloop.
-          append <c> to lt_ordered_classes.
+          append <c> to r_ordered_classes.
           delete lt_unordered_classes index l_index.
         endif.
       endloop.
 
     endwhile.
 
+  endmethod.
+
+  method process_clas.
+
+*    data lt_unordered_classes type tt_class_names.
+*    lt_unordered_classes = m_classes.
+
+    data lt_ordered_classes type tt_class_names.
+
+    lt_ordered_classes = order_classes_by_dep( m_classes ).
+*    lt_ordered_classes = m_classes.
+
     " Serialize
 
     data lt_code like rt_codetab.
     data lo_accessor type ref to lcl_extractor_clas.
     data lv_marker type string.
+    field-symbols <c> like line of lt_ordered_classes.
 
     create object lo_accessor.
 
@@ -283,8 +327,29 @@ class lcl_main implementation.
       endif.
 
       lt_code = lo_accessor->zif_iasm_devobj_accessor~get_code( |{ <c> }| ).
+      apply_renames( changing ct_codetab = lt_code ).
       append lines of lt_code to rt_codetab.
 
+    endloop.
+
+  endmethod.
+
+  method apply_renames.
+
+    field-symbols <i> like line of ct_codetab.
+    field-symbols <r> like line of m_renames.
+    data regex type string.
+
+    " basic apprach - just replace full names
+    loop at m_renames assigning <r>.
+      regex = `\b` && <r>-from && `\b`.
+      loop at ct_codetab assigning <i>.
+        <i> = replace(
+          val   = <i>
+          regex = regex
+          with  = <r>-to
+          case  = abap_false ).
+      endloop.
     endloop.
 
   endmethod.
@@ -350,7 +415,7 @@ tables: seoclasstx.
 
 selection-screen begin of block b1 with frame title txt_b1.
 
-parameters p_prog type programm default 'ZIS_EXAMPLE'.
+parameters p_prog type programm.
 select-options s_class for seoclasstx-clsname.
 parameters p_womark type xfeld.
 
@@ -374,8 +439,19 @@ parameters p_code type char1 radiobutton group r1.
 selection-screen end of line.
 
 selection-screen begin of line.
+selection-screen comment (24) txt_copy  for field p_copy.
+parameters p_copy type char1 radiobutton group r1.
+selection-screen end of line.
+
+selection-screen begin of line.
 selection-screen comment (24) txt_path  for field p_path  modif id pth.
 parameters p_path type char255                            modif id pth.
+selection-screen end of line.
+
+selection-screen begin of line.
+selection-screen comment (24) txt_rena  for field p_ren_f.
+parameters p_ren_f type char20.
+parameters p_ren_t type char20.
 selection-screen end of line.
 
 selection-screen end of block b2.
@@ -388,7 +464,9 @@ initialization.
   txt_disp = 'Show on display'.         "#EC NOTEXT
   txt_file = 'Save to file'.            "#EC NOTEXT
   txt_code = 'Save to target program'.  "#EC NOTEXT
-  txt_path = 'Path to file / Prog name'."#EC NOTEXT
+  txt_copy = 'Copy to package'.         "#EC NOTEXT
+  txt_path = 'Target (File/Prog/Pkg)'.  "#EC NOTEXT
+  txt_rena = 'Rename'.                  "#EC NOTEXT
 
   " TODO normal parameters show/hide and file/prog-search
 
@@ -420,7 +498,9 @@ form main.
       i_classes         = lt_class_list
       i_disable_marking = p_womark
       i_path            = |{ p_path }|
-      i_saver           = lv_saver_type.
+      i_saver           = lv_saver_type
+      i_rename_from     = |{ p_ren_f }|
+      i_rename_to       = |{ p_ren_t }|.
   lo_app->run( ).
 
 endform.
