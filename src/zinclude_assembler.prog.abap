@@ -48,19 +48,12 @@ class lcl_main definition final.
         from type seoclasstx-clsname,
       end of ty_deps,
 
-      begin of ty_rename,
-        from type seoclasstx-clsname,
-        to type seoclasstx-clsname,
-      end of ty_rename,
-
-      tt_deps type standard table of ty_deps with default key,
-      tt_class_names type standard table of seoclasstx-clsname with default key,
-      ts_class_names type sorted table of seoclasstx-clsname with unique key table_line.
+      tt_deps type standard table of ty_deps with default key.
 
     data:
-      m_renames         type sorted table of ty_rename with unique key from,
+      m_renames         type zif_iasm_types=>ts_renames,
       m_progname        type sobj_name,
-      m_classes         type ts_class_names,
+      m_classes         type zif_iasm_types=>ts_class_names,
       m_disable_marking type abap_bool,
       m_path            type string,
       m_saver           type char1.
@@ -68,7 +61,7 @@ class lcl_main definition final.
     methods constructor
       importing
         i_progname        type sobj_name
-        i_classes         type tt_class_names
+        i_classes         type zif_iasm_types=>tt_class_names
         i_disable_marking type abap_bool
         i_path            type string
         i_saver           type char1
@@ -96,15 +89,11 @@ class lcl_main definition final.
         value(rt_codetab) type string_table
       raising zcx_iasm_error.
 
-    methods apply_renames
-      changing
-        value(ct_codetab) type string_table.
-
     class-methods order_classes_by_dep
       importing
-        i_classes type ts_class_names
+        i_classes type zif_iasm_types=>ts_class_names
       returning
-        value(r_ordered_classes) type tt_class_names
+        value(r_ordered_classes) type zif_iasm_types=>tt_class_names
       raising
         zcx_iasm_error.
 
@@ -266,7 +255,7 @@ class lcl_main implementation.
       endif.
     endloop.
 
-    data lt_unordered_classes type tt_class_names.
+    data lt_unordered_classes type zif_iasm_types=>tt_class_names.
     data l_index type i.
     lt_unordered_classes = i_classes.
 
@@ -299,7 +288,7 @@ class lcl_main implementation.
 *    data lt_unordered_classes type tt_class_names.
 *    lt_unordered_classes = m_classes.
 
-    data lt_ordered_classes type tt_class_names.
+    data lt_ordered_classes type zif_iasm_types=>tt_class_names.
 
     lt_ordered_classes = order_classes_by_dep( m_classes ).
 *    lt_ordered_classes = m_classes.
@@ -327,29 +316,11 @@ class lcl_main implementation.
       endif.
 
       lt_code = lo_accessor->zif_iasm_devobj_accessor~get_code( |{ <c> }| ).
-      apply_renames( changing ct_codetab = lt_code ).
+      zcl_iasm_utils=>apply_renames(
+        exporting it_renames = m_renames
+        changing  ct_codetab = lt_code ).
       append lines of lt_code to rt_codetab.
 
-    endloop.
-
-  endmethod.
-
-  method apply_renames.
-
-    field-symbols <i> like line of ct_codetab.
-    field-symbols <r> like line of m_renames.
-    data regex type string.
-
-    " basic apprach - just replace full names
-    loop at m_renames assigning <r>.
-      regex = `\b` && <r>-from && `\b`.
-      loop at ct_codetab assigning <i>.
-        <i> = replace(
-          val   = <i>
-          regex = regex
-          with  = <r>-to
-          case  = abap_false ).
-      endloop.
     endloop.
 
   endmethod.
@@ -406,6 +377,12 @@ class lcl_main implementation.
 
   endmethod.
 endclass.
+
+**********************************************************************
+* CLONER APP
+**********************************************************************
+
+include zinclude_assembler_cloner_app.
 
 **********************************************************************
 * SELECTION SCREEN
@@ -475,9 +452,9 @@ initialization.
 **********************************************************************
 form main.
 
-  data lo_app type ref to lcl_main.
   data lv_saver_type type c length 1.
-  data lt_class_list type lcl_main=>tt_class_names.
+  data lt_class_list type zif_iasm_types=>tt_class_names.
+  data lx type ref to zcx_iasm_error.
 
   case 'X'.
     when p_disp.
@@ -492,16 +469,33 @@ form main.
     into table lt_class_list
     where clsname in s_class.
 
-  create object lo_app
-    exporting
-      i_progname        = p_prog
-      i_classes         = lt_class_list
-      i_disable_marking = p_womark
-      i_path            = |{ p_path }|
-      i_saver           = lv_saver_type
-      i_rename_from     = |{ p_ren_f }|
-      i_rename_to       = |{ p_ren_t }|.
-  lo_app->run( ).
+  try.
+    if p_copy = 'X'.
+      data lo_app_cloner type ref to lcl_cloner_app.
+      create object lo_app_cloner
+        exporting
+          i_classes         = lt_class_list
+          i_target_pkg      = |{ p_path }|
+          i_rename_from     = |{ p_ren_f }|
+          i_rename_to       = |{ p_ren_t }|.
+      lo_app_cloner->run( ).
+    else.
+      data lo_app type ref to lcl_main.
+      create object lo_app
+        exporting
+          i_progname        = p_prog
+          i_classes         = lt_class_list
+          i_disable_marking = p_womark
+          i_path            = |{ p_path }|
+          i_saver           = lv_saver_type
+          i_rename_from     = |{ p_ren_f }|
+          i_rename_to       = |{ p_ren_t }|.
+      lo_app->run( ).
+    endif.
+
+  catch zcx_iasm_error into lx.
+    message lx type 'E'.
+  endtry.
 
 endform.
 
