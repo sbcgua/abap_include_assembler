@@ -57,7 +57,7 @@ class lcl_cloner_app implementation.
           i_class = <c>
           i_target_package = m_target_package
           it_renames = m_renames.
-
+      cloner->clone( ).
     endloop.
 
   endmethod.

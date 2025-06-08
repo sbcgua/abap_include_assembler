@@ -494,7 +494,7 @@ form main.
     endif.
 
   catch zcx_iasm_error into lx.
-    message lx type 'E'.
+    message lx->msg type 'S' display like 'E'.
   endtry.
 
 endform.
