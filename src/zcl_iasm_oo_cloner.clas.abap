@@ -180,6 +180,12 @@ CLASS ZCL_IASM_OO_CLONER IMPLEMENTATION.
         ).
       endloop.
 
+      zcl_abapgit_factory=>get_cts_api( )->insert_transport_object(
+        iv_object   = ls_dst_item-obj_type
+        iv_obj_name = ls_dst_item-obj_name
+        iv_package  = ls_dst_item-devclass
+        iv_language = 'E' ).
+
       zcl_abapgit_factory=>get_default_transport( )->reset( ).
 
       " ZCL_ABAPGIT_OBJECTS=>UPDATE_PACKAGE_TREE?
