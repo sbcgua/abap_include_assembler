@@ -168,6 +168,24 @@ CLASS ZCL_IASM_OO_CLONER IMPLEMENTATION.
       data log type ref to zif_abapgit_log.
       create object log type zcl_abapgit_log.
 
+
+      data ls_req type trwbo_request_header.
+
+      call function 'TR_REQUEST_CHOICE'
+        exporting
+          iv_request_types = 'K'
+        importing
+          es_request = ls_req
+        exceptions
+          others = 4.
+
+
+
+
+
+
+
+
       zcl_abapgit_factory=>get_default_transport( )->set( 'SBSK900746' ).
 
       loop at lt_steps into step.
@@ -180,11 +198,72 @@ CLASS ZCL_IASM_OO_CLONER IMPLEMENTATION.
         ).
       endloop.
 
-      zcl_abapgit_factory=>get_cts_api( )->insert_transport_object(
-        iv_object   = ls_dst_item-obj_type
-        iv_obj_name = ls_dst_item-obj_name
-        iv_package  = ls_dst_item-devclass
-        iv_language = 'E' ).
+       zcl_abapgit_factory=>get_cts_api( )->insert_transport_object(
+         iv_object   = ls_dst_item-obj_type
+         iv_obj_name = ls_dst_item-obj_name
+         iv_package  = ls_dst_item-devclass
+         iv_language = 'E' ).
+
+
+*      data lt_e071 type standard table of e071.
+*      data ls_e071 type e071.
+*
+*      ls_e071-pgmid    = 'R3TR'.          " Program ID, e.g. 'R3TR' for repository objects
+*      ls_e071-object   = ls_dst_item-obj_type. " Object type, e.g. 'CLAS' for class
+*      ls_e071-obj_name = ls_dst_item-obj_name. " Object name (in upper case)
+*      append ls_e071 to lt_e071.
+
+      data l_ord type e070-trkorr.
+      data l_task type e070-trkorr.
+
+*      call function 'RS_CORR_INSERT'
+*        exporting
+*          object       = ls_dst_item-obj_name
+*          object_class = ls_dst_item-obj_type
+**          devclass            = iv_package
+**          master_language     = iv_language
+*          mode         = 'I'
+*          global_lock    = abap_true
+*          korrnum      = ls_req-trkorr
+**        suppress_dialog     = abap_true
+*        importing
+*          korrnum = l_ord
+*          ordernum = l_task
+*        exceptions
+*          others    = 1.
+
+      if sy-subrc <> 0.
+        " handle error
+      endif.
+
+*    data cts_instance type ref to if_adt_cts_management.
+*    data xcts type ref to cx_adt_cts_insert_error.
+*    cts_instance = cl_adt_cts_management=>create_instance( ).
+*
+*
+*    data cts_result type cts_result.
+*    data cts_messages type cts_messages.
+*    data cts_request type cts_request.
+*    data cts_object_locks type cts_object_locks.
+
+
+*    TRY.
+*      cts_instance->insert_objects_in_wb_request(
+*        exporting
+*          pgmid        = 'R3TR'
+*          object       = ls_dst_item-obj_type
+*          obj_name     = |{ ls_dst_item-obj_name }|
+*        importing
+*          result       = cts_result
+*          request      = cts_request
+*          messages     = cts_messages
+*          object_locks = cts_object_locks
+*        changing
+*          trkorr       = ls_req-trkorr ).
+*    CATCH cx_adt_cts_insert_error into xcts.
+*      write: 'error'.
+*    ENDTRY.
+
 
       zcl_abapgit_factory=>get_default_transport( )->reset( ).
 
