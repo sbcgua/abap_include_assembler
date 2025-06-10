@@ -164,6 +164,13 @@ class lcl_functions implementation.
             iv_language    = 'E'
             io_files       = e_files
             io_i18n_params = lo_i18n_params.
+      elseif is_item-obj_type = 'PROG'.
+        create object ser type zcl_abapgit_object_prog
+          exporting
+            is_item        = is_item
+            iv_language    = 'E'
+            io_files       = e_files
+            io_i18n_params = lo_i18n_params.
       else.
         zcx_iasm_error=>raise( |Unexpected type of object { is_item-obj_type }| ).
       endif.
@@ -198,6 +205,13 @@ class lcl_functions implementation.
             io_i18n_params = lo_i18n_params.
       elseif is_item-obj_type = 'CLAS'.
         create object deser type zcl_abapgit_object_clas
+          exporting
+            is_item        = is_item
+            iv_language    = 'E'
+            io_files       = i_files
+            io_i18n_params = lo_i18n_params.
+      elseif is_item-obj_type = 'PROG'.
+        create object deser type zcl_abapgit_object_prog
           exporting
             is_item        = is_item
             iv_language    = 'E'

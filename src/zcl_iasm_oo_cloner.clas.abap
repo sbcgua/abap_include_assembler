@@ -5,13 +5,16 @@ class ZCL_IASM_OO_CLONER definition
 
   public section.
 
+    constants oo_auto type tadir-object value 'OO'.
+
     methods constructor
       importing
-        i_class type seoclsname
-        it_renames type zif_iasm_types=>ts_renames
+        i_obj_type       type tadir-object
+        i_obj_name       type tadir-obj_name
+        it_renames       type zif_iasm_types=>ts_renames
         i_target_package type devclass
-        i_trans type e070-trkorr
-        i_verbose type abap_bool default abap_false
+        i_trans          type e070-trkorr
+        i_verbose        type abap_bool default abap_false
       raising
         zcx_iasm_error.
     methods clone
@@ -21,23 +24,27 @@ class ZCL_IASM_OO_CLONER definition
   protected section.
   private section.
 
-    data m_class type seoclsname.
-    data m_class_to type seoclsname.
     data mt_renames type zif_iasm_types=>ts_renames.
-    data m_target_package type devclass.
-    data m_trans type e070-trkorr.
-    data m_verbose type abap_bool.
+    data m_trans    type e070-trkorr.
+    data m_verbose  type abap_bool.
+
+    data ms_src_item type zif_abapgit_definitions=>ty_item.
+    data ms_dst_item type zif_abapgit_definitions=>ty_item.
 
     methods patch_clas
       importing
-        i_dst_item type zif_abapgit_definitions=>ty_item
         i_xml type ref to lcl_pseudo_xml
       raising
         zcx_iasm_error.
 
     methods patch_intf
       importing
-        i_dst_item type zif_abapgit_definitions=>ty_item
+        i_xml type ref to lcl_pseudo_xml
+      raising
+        zcx_iasm_error.
+
+    methods patch_prog
+      importing
         i_xml type ref to lcl_pseudo_xml
       raising
         zcx_iasm_error.
@@ -59,54 +66,39 @@ CLASS ZCL_IASM_OO_CLONER IMPLEMENTATION.
 
     if m_verbose = abap_true.
       data lv_pkg_str type string.
-      lv_pkg_str = |({ m_target_package })|.
-      write: / 'Cloning:', m_class, '->', m_class_to, lv_pkg_str.
+      lv_pkg_str = |({ ms_dst_item-devclass })|.
+      write: / 'Cloning:', ms_src_item-obj_type, ms_src_item-obj_name, '->', ms_dst_item-obj_name, lv_pkg_str.
     endif.
-
-    data ls_src_item type zif_abapgit_definitions=>ty_item.
-    data ls_dst_item type zif_abapgit_definitions=>ty_item.
-
-    ls_src_item-obj_name = m_class.
-    ls_src_item-obj_type = lcl_functions=>get_object_type( |{ m_class }| ).
-    if ls_src_item-obj_type is initial.
-      write: / 'Only CLAS/INTF objects are supported yet', m_class.
-      return.
-    endif.
-
-    ls_dst_item-obj_type = ls_src_item-obj_type.
-    ls_dst_item-obj_name = m_class_to.
-    ls_dst_item-devclass = m_target_package.
 
     data files type ref to zcl_abapgit_objects_files.
     data lo_xml type ref to lcl_pseudo_xml.
 
     lcl_functions=>serialize(
       exporting
-        is_item = ls_src_item
+        is_item = ms_src_item
       importing
         e_files = files
         e_xml   = lo_xml ).
 
-    case ls_src_item-obj_type.
+    case ms_src_item-obj_type.
       when 'CLAS'.
-        patch_clas(
-          i_dst_item = ls_dst_item
-          i_xml      = lo_xml ).
-        patch_code( i_files = files ).
+        patch_clas( lo_xml ).
+        patch_code( files ).
       when 'INTF'.
-        patch_intf(
-          i_dst_item = ls_dst_item
-          i_xml      = lo_xml ).
-        patch_code( i_files = files ).
+        patch_intf( lo_xml ).
+        patch_code( files ).
+      when 'PROG'.
+        patch_prog( lo_xml ).
+        patch_code( files ).
       when others.
-        zcx_iasm_error=>raise( |Unexpected type of object { ls_src_item-obj_type }| ).
+        zcx_iasm_error=>raise( |Unexpected type of object { ms_src_item-obj_type }| ).
     endcase.
 
     lcl_functions=>set_default_transport( m_trans ).
 
     data log type ref to zif_abapgit_log.
     log = lcl_functions=>deserialize(
-      is_item = ls_dst_item
+      is_item = ms_dst_item
       i_files = files
       i_xml   = lo_xml ).
 
@@ -118,7 +110,7 @@ CLASS ZCL_IASM_OO_CLONER IMPLEMENTATION.
 *      zcl_abapgit_objects=>update_package_tree?
 
     lcl_functions=>put_to_transport(
-      is_item = ls_dst_item
+      is_item = ms_dst_item
       i_trans = m_trans ).
 
   endmethod.
@@ -126,27 +118,47 @@ CLASS ZCL_IASM_OO_CLONER IMPLEMENTATION.
 
   method constructor.
 
-    m_class          = to_upper( i_class ).
-    mt_renames       = it_renames.
-    m_target_package = to_upper( i_target_package ).
-    m_trans          = i_trans.
-    m_verbose        = i_verbose.
+    if i_obj_type is initial.
+      zcx_iasm_error=>raise( |i_obj_type cannot be empty| ).
+    endif.
+    if i_obj_name is initial.
+      zcx_iasm_error=>raise( |i_obj_name cannot be empty| ).
+    endif.
+    if it_renames is initial.
+      zcx_iasm_error=>raise( |it_renames cannot be empty| ).
+    endif.
+    if i_target_package is initial.
+      zcx_iasm_error=>raise( |i_target_package cannot be empty| ).
+    endif.
+
+    ms_src_item-obj_name = to_upper( i_obj_name ).
+    if i_obj_type = oo_auto. " Autodetect class / interface
+      ms_src_item-obj_type = lcl_functions=>get_object_type( ms_src_item-obj_name ).
+      if ms_src_item-obj_type is initial.
+        zcx_iasm_error=>raise( |i_obj_type was not detected| ).
+      endif.
+    else.
+      ms_src_item-obj_type = i_obj_type. " PROG
+    endif.
+
+    mt_renames = it_renames.
+    m_trans    = i_trans.
+    m_verbose  = i_verbose.
+
+    ms_dst_item-obj_type = ms_src_item-obj_type.
+    ms_dst_item-devclass = to_upper( i_target_package ).
 
     data r like line of it_renames.
     loop at it_renames into r.
-      if to_lower( r-from ) = to_lower( i_class ).
-        m_class_to = to_upper( r-to ).
+      if to_lower( r-from ) = to_lower( ms_src_item-obj_name ).
+        ms_dst_item-obj_name = to_upper( r-to ).
         exit.
       endif.
     endloop.
 
-    if m_class_to is initial.
-      zcx_iasm_error=>raise( |Cannot rename class { i_class }| ).
+    if ms_dst_item-obj_name is initial.
+      zcx_iasm_error=>raise( |Cannot rename { ms_src_item-obj_name }| ).
     endif.
-
-    assert m_class is not initial.
-    assert m_class_to is not initial.
-    assert m_target_package is not initial.
 
   endmethod.
 
@@ -156,7 +168,7 @@ CLASS ZCL_IASM_OO_CLONER IMPLEMENTATION.
     data lr_props_c type ref to vseoclass.
 
     lr_props_c ?= i_xml->get_ref( 'VSEOCLASS' ).
-    lr_props_c->clsname = i_dst_item-obj_name.
+    lr_props_c->clsname = ms_dst_item-obj_name.
     lr_props_c->with_unit_tests = ''.
 
   endmethod.
@@ -210,7 +222,21 @@ CLASS ZCL_IASM_OO_CLONER IMPLEMENTATION.
     data lr_props_i type ref to vseointerf.
 
     lr_props_i ?= i_xml->get_ref( 'VSEOINTERF' ).
-    lr_props_i->clsname = i_dst_item-obj_name.
+    lr_props_i->clsname = ms_dst_item-obj_name.
+
+  endmethod.
+
+
+  method patch_prog.
+
+    data lr_props_p type ref to data.
+    field-symbols <struc> type any.
+    field-symbols <progname> type progdir-name.
+
+    lr_props_p = i_xml->get_ref( 'PROGDIR' ).
+    assign lr_props_p->* to <struc>.
+    assign component 'NAME' of structure <struc> to <progname>.
+    <progname> = ms_dst_item-obj_name.
 
   endmethod.
 ENDCLASS.

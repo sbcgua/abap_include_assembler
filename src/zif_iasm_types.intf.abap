@@ -4,6 +4,8 @@ interface zif_iasm_types public.
     tt_class_names type standard table of seoclasstx-clsname with default key,
     ts_class_names type sorted table of seoclasstx-clsname with unique key table_line.
 
+  types:
+    tt_prog_names type standard table of trdir-name with default key.
 
   types:
     begin of ty_rename,

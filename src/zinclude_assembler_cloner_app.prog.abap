@@ -4,6 +4,7 @@ class lcl_cloner_app definition final.
     methods constructor
       importing
         i_classes         type zif_iasm_types=>tt_class_names
+        i_progs           type zif_iasm_types=>tt_prog_names
         i_rename_from     type seoclasstx-clsname
         i_rename_to       type seoclasstx-clsname
         i_target_pkg      type devclass
@@ -15,9 +16,16 @@ class lcl_cloner_app definition final.
         zcx_iasm_error.
 
   private section.
+
+    types:
+      begin of ty_obj,
+        obj_type type tadir-object,
+        obj_name type tadir-obj_name,
+      end of ty_obj.
+
     data:
+      m_objects         type standard table of ty_obj,
       m_renames         type zif_iasm_types=>ts_renames,
-      m_classes         type zif_iasm_types=>tt_class_names,
       m_target_package  type devclass.
 
 endclass.
@@ -26,22 +34,41 @@ class lcl_cloner_app implementation.
 
   method constructor.
 
-    m_classes        = i_classes.
+    if i_rename_from is initial or i_rename_to is initial.
+      zcx_iasm_error=>raise( |Rename pattern is not specified| ).
+    endif.
+
     m_target_package = i_target_pkg.
 
-    field-symbols <i> like line of m_classes.
+    field-symbols <c> like line of i_classes.
+    field-symbols <p> like line of i_progs.
+    field-symbols <obj> like line of m_objects.
+
+    loop at i_classes assigning <c>.
+      append initial line to m_objects assigning <obj>.
+      <obj>-obj_type = zcl_iasm_oo_cloner=>oo_auto.
+      <obj>-obj_name = to_upper( <c> ).
+    endloop.
+
+    loop at i_progs assigning <p>.
+      append initial line to m_objects assigning <obj>.
+      <obj>-obj_type = 'PROG'.
+      <obj>-obj_name = to_upper( <p> ).
+    endloop.
+
     data r like line of m_renames.
 
-    if i_rename_from is not initial and i_rename_to is not initial.
-      loop at m_classes assigning <i>.
-        r-from = to_lower( <i> ).
-        r-to   = to_lower( replace( val = <i> sub = i_rename_from with = i_rename_to ) ).
-        if r-from = r-to.
-          zcx_iasm_error=>raise( |class is not renamed { r-from }| ).
-        endif.
-        insert r into table m_renames.
-      endloop.
-    endif.
+    loop at m_objects assigning <obj>.
+      r-from = to_lower( <obj>-obj_name ).
+      r-to   = to_lower( replace(
+        val  = <obj>-obj_name
+        sub  = i_rename_from
+        with = i_rename_to ) ).
+      if r-from = r-to.
+        zcx_iasm_error=>raise( |Object is not renamed { r-from }| ).
+      endif.
+      insert r into table m_renames.
+    endloop.
 
   endmethod.
 
@@ -59,17 +86,19 @@ class lcl_cloner_app implementation.
       zcx_iasm_error=>raise( 'Please specify the transport' ).
     endif.
 
-    field-symbols <c> like line of m_classes.
-    loop at m_classes assigning <c>.
+    data cloner type ref to zcl_iasm_oo_cloner.
+    field-symbols <obj> like line of m_objects.
 
-      data cloner type ref to zcl_iasm_oo_cloner.
+    loop at m_objects assigning <obj>.
+
       create object cloner
         exporting
-          i_class = <c>
+          i_obj_type       = <obj>-obj_type
+          i_obj_name       = <obj>-obj_name
           i_target_package = m_target_package
-          i_trans = ls_req-trkorr
-          i_verbose = abap_true
-          it_renames = m_renames.
+          i_trans          = ls_req-trkorr
+          i_verbose        = abap_true
+          it_renames       = m_renames.
       cloner->clone( ).
 
     endloop.

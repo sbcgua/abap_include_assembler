@@ -387,11 +387,11 @@ include zinclude_assembler_cloner_app.
 * SELECTION SCREEN
 **********************************************************************
 
-tables: seoclasstx.
+tables: seoclasstx, trdir.
 
 selection-screen begin of block b1 with frame title txt_b1.
 
-parameters p_prog type programm.
+select-options s_prog for trdir-name.
 select-options s_class for seoclasstx-clsname.
 parameters p_womark type xfeld.
 
@@ -453,6 +453,8 @@ form main.
 
   data lv_saver_type type c length 1.
   data lt_class_list type zif_iasm_types=>tt_class_names.
+  data lt_prog_list type zif_iasm_types=>tt_prog_names.
+  data lv_1st_prog like line of lt_prog_list.
   data lx type ref to zcx_iasm_error.
 
   case 'X'.
@@ -464,15 +466,25 @@ form main.
       lv_saver_type = 'C'.
   endcase.
 
-  select clsname from seoclasstx
-    into table lt_class_list
-    where clsname in s_class.
+  if s_class[] is not initial.
+    select clsname from seoclasstx
+      into table lt_class_list
+      where clsname in s_class.
+  endif.
+
+  if s_prog[] is not initial.
+    select name from trdir
+      into table lt_prog_list
+      where name in s_prog.
+    read table lt_prog_list into lv_1st_prog index 1.
+  endif.
 
   try.
     if p_copy = 'X'.
       data lo_app_cloner type ref to lcl_cloner_app.
       create object lo_app_cloner
         exporting
+          i_progs           = lt_prog_list
           i_classes         = lt_class_list
           i_target_pkg      = |{ p_path }|
           i_rename_from     = |{ p_ren_f }|
@@ -482,7 +494,7 @@ form main.
       data lo_app type ref to lcl_main.
       create object lo_app
         exporting
-          i_progname        = p_prog
+          i_progname        = lv_1st_prog
           i_classes         = lt_class_list
           i_disable_marking = p_womark
           i_path            = |{ p_path }|
