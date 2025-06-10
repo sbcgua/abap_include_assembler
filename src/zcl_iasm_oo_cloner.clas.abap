@@ -10,6 +10,8 @@ class ZCL_IASM_OO_CLONER definition
         i_class type seoclsname
         it_renames type zif_iasm_types=>ts_renames
         i_target_package type devclass
+        i_trans type e070-trkorr
+        i_verbose type abap_bool default abap_false
       raising
         zcx_iasm_error.
     methods clone
@@ -23,11 +25,12 @@ class ZCL_IASM_OO_CLONER definition
     data m_class_to type seoclsname.
     data mt_renames type zif_iasm_types=>ts_renames.
     data m_target_package type devclass.
+    data m_trans type e070-trkorr.
+    data m_verbose type abap_bool.
 
     methods patch_clas
       importing
         i_dst_item type zif_abapgit_definitions=>ty_item
-        i_files type ref to zcl_abapgit_objects_files
         i_xml type ref to lcl_pseudo_xml
       raising
         zcx_iasm_error.
@@ -35,8 +38,15 @@ class ZCL_IASM_OO_CLONER definition
     methods patch_intf
       importing
         i_dst_item type zif_abapgit_definitions=>ty_item
+        i_xml type ref to lcl_pseudo_xml
+      raising
+        zcx_iasm_error.
+
+    methods patch_code
+      importing
         i_files type ref to zcl_abapgit_objects_files
-        i_xml type ref to lcl_pseudo_xml.
+      raising
+        zcx_iasm_error.
 
 ENDCLASS.
 
@@ -46,6 +56,12 @@ CLASS ZCL_IASM_OO_CLONER IMPLEMENTATION.
 
 
   method clone.
+
+    if m_verbose = abap_true.
+      data lv_pkg_str type string.
+      lv_pkg_str = |({ m_target_package })|.
+      write: / 'Cloning:', m_class, '->', m_class_to, lv_pkg_str.
+    endif.
 
     data ls_src_item type zif_abapgit_definitions=>ty_item.
     data ls_dst_item type zif_abapgit_definitions=>ty_item.
@@ -75,19 +91,18 @@ CLASS ZCL_IASM_OO_CLONER IMPLEMENTATION.
       when 'CLAS'.
         patch_clas(
           i_dst_item = ls_dst_item
-          i_files    = files
           i_xml      = lo_xml ).
+        patch_code( i_files = files ).
       when 'INTF'.
         patch_intf(
           i_dst_item = ls_dst_item
-          i_files    = files
           i_xml      = lo_xml ).
+        patch_code( i_files = files ).
       when others.
         zcx_iasm_error=>raise( |Unexpected type of object { ls_src_item-obj_type }| ).
     endcase.
 
-      zcl_abapgit_factory=>get_default_transport( )->set( 'SBSK900746' ).
-      zcl_abapgit_factory=>get_default_transport( )->reset( ).
+    lcl_functions=>set_default_transport( m_trans ).
 
     data log type ref to zif_abapgit_log.
     log = lcl_functions=>deserialize(
@@ -95,14 +110,7 @@ CLASS ZCL_IASM_OO_CLONER IMPLEMENTATION.
       i_files = files
       i_xml   = lo_xml ).
 
-    data ls_req type trwbo_request_header.
-    call function 'TR_REQUEST_CHOICE'
-      exporting
-        iv_request_types = 'K'
-      importing
-        es_request = ls_req
-      exceptions
-        others = 4.
+    lcl_functions=>set_default_transport( '' ). " reset
 
 *      zcl_abapgit_factory=>get_default_transport( )->set( 'SBSK900746' ).
 *      zcl_abapgit_factory=>get_default_transport( )->reset( ).
@@ -111,7 +119,7 @@ CLASS ZCL_IASM_OO_CLONER IMPLEMENTATION.
 
     lcl_functions=>put_to_transport(
       is_item = ls_dst_item
-      i_trans = ls_req-trkorr ).
+      i_trans = m_trans ).
 
   endmethod.
 
@@ -121,6 +129,8 @@ CLASS ZCL_IASM_OO_CLONER IMPLEMENTATION.
     m_class          = to_upper( i_class ).
     mt_renames       = it_renames.
     m_target_package = to_upper( i_target_package ).
+    m_trans          = i_trans.
+    m_verbose        = i_verbose.
 
     data r like line of it_renames.
     loop at it_renames into r.
@@ -143,14 +153,20 @@ CLASS ZCL_IASM_OO_CLONER IMPLEMENTATION.
 
   method patch_clas.
 
-    data lx_ag type ref to zcx_abapgit_exception.
     data lr_props_c type ref to vseoclass.
-    data files_data type zif_abapgit_git_definitions=>ty_files_tt.
-    field-symbols <file> like line of files_data.
 
     lr_props_c ?= i_xml->get_ref( 'VSEOCLASS' ).
     lr_props_c->clsname = i_dst_item-obj_name.
     lr_props_c->with_unit_tests = ''.
+
+  endmethod.
+
+
+  method patch_code.
+
+    data lx_ag type ref to zcx_abapgit_exception.
+    data files_data type zif_abapgit_git_definitions=>ty_files_tt.
+    field-symbols <file> like line of files_data.
 
     try.
       files_data = i_files->get_files( ).
@@ -174,7 +190,9 @@ CLASS ZCL_IASM_OO_CLONER IMPLEMENTATION.
           changing
             ct_codetab = lt_codetab ).
 
-        <file>-data = zcl_abapgit_convert=>string_to_xstring_utf8( concat_lines_of( table = lt_codetab sep = cl_abap_char_utilities=>newline ) ).
+        <file>-data = zcl_abapgit_convert=>string_to_xstring_utf8( concat_lines_of(
+          table = lt_codetab
+          sep   = cl_abap_char_utilities=>newline ) ).
 
       endloop.
 

@@ -36,7 +36,6 @@ include zinclude_assembler_matchers.
 include zinclude_assembler_code_obj.
 include zinclude_assembler_assembler.
 
-
 **********************************************************************
 * MAIN
 **********************************************************************

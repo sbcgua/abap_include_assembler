@@ -110,6 +110,11 @@ class lcl_functions definition final.
         i_trans type e070-trkorr
       raising
         zcx_iasm_error.
+    class-methods set_default_transport
+      importing
+        i_trans type e070-trkorr
+      raising
+        zcx_iasm_error.
 
 endclass.
 
@@ -248,6 +253,22 @@ class lcl_functions implementation.
           others              = 4.
       if sy-subrc <> 0.
         zcx_abapgit_exception=>raise_t100( ).
+      endif.
+    catch zcx_abapgit_exception into lx_ag.
+      zcx_iasm_error=>raise( lx_ag->get_text( ) ).
+    endtry.
+
+  endmethod.
+
+  method set_default_transport.
+
+    data lx_ag type ref to zcx_abapgit_exception.
+
+    try.
+      if i_trans is initial.
+        zcl_abapgit_factory=>get_default_transport( )->reset( ).
+      else.
+        zcl_abapgit_factory=>get_default_transport( )->set( i_trans ).
       endif.
     catch zcx_abapgit_exception into lx_ag.
       zcx_iasm_error=>raise( lx_ag->get_text( ) ).

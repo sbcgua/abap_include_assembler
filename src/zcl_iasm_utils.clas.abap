@@ -34,7 +34,8 @@ CLASS ZCL_IASM_UTILS IMPLEMENTATION.
           val   = <i>
           regex = regex
           with  = <r>-to
-          case  = abap_false ).
+          case  = abap_false
+          occ   = 0 ).
       endloop.
     endloop.
 
