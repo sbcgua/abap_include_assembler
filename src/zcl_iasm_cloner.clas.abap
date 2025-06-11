@@ -1,20 +1,20 @@
-class ZCL_IASM_OO_CLONER definition
+class ZCL_IASM_CLONER definition
   public
   final
   create public.
 
   public section.
 
-    constants oo_auto type tadir-object value 'OO'.
+    constants oo_auto type tadir-object value 'OO'. "#EC NOTEXT
 
     methods constructor
       importing
-        i_obj_type       type tadir-object
-        i_obj_name       type tadir-obj_name
-        it_renames       type zif_iasm_types=>ts_renames
-        i_target_package type devclass
-        i_trans          type e070-trkorr
-        i_verbose        type abap_bool default abap_false
+        !i_obj_type type tadir-object
+        !i_obj_name type tadir-obj_name
+        !it_renames type zif_iasm_types=>ts_renames
+        !i_target_package type devclass
+        !i_trans type e070-trkorr
+        !i_verbose type abap_bool default abap_false
       raising
         zcx_iasm_error.
     methods clone
@@ -59,7 +59,7 @@ ENDCLASS.
 
 
 
-CLASS ZCL_IASM_OO_CLONER IMPLEMENTATION.
+CLASS ZCL_IASM_CLONER IMPLEMENTATION.
 
 
   method clone.

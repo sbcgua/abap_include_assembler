@@ -47,7 +47,7 @@ class lcl_cloner_app implementation.
 
     loop at i_classes assigning <c>.
       append initial line to m_objects assigning <obj>.
-      <obj>-obj_type = zcl_iasm_oo_cloner=>oo_auto.
+      <obj>-obj_type = zcl_iasm_cloner=>oo_auto.
       <obj>-obj_name = to_upper( <c> ).
     endloop.
 
@@ -89,7 +89,7 @@ class lcl_cloner_app implementation.
       zcx_iasm_error=>raise( 'Please specify the transport' ).
     endif.
 
-    data cloner type ref to zcl_iasm_oo_cloner.
+    data cloner type ref to zcl_iasm_cloner.
     field-symbols <obj> like line of m_objects.
 
     loop at m_objects assigning <obj>.
