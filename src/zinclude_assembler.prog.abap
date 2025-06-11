@@ -424,14 +424,38 @@ selection-screen comment (24) txt_path  for field p_path  modif id pth.
 parameters p_path type char255                            modif id pth.
 selection-screen end of line.
 
-selection-screen begin of line.
-selection-screen comment (24) txt_rena  for field p_ren_f.
-parameters p_ren_f type char20.
-parameters p_ren_t type char20.
-selection-screen end of line.
-
 selection-screen end of block b2.
 
+selection-screen begin of block b3 with frame title txt_b3.
+
+selection-screen begin of line.
+selection-screen comment (24) txt_rena  for field p_ren_f modif id cop.
+parameters p_ren_f type char20 modif id cop.
+parameters p_ren_t type char20 modif id cop.
+selection-screen end of line.
+
+selection-screen begin of line.
+selection-screen comment (21) txt_rx1 for field s_renx1 modif id cop.
+select-options s_renx1 for trdir-name no intervals modif id cop.
+selection-screen comment 50(18) txt_rx2 for field s_renx2 modif id cop.
+select-options s_renx2 for trdir-name no intervals lower case modif id cop.
+selection-screen end of line.
+
+selection-screen end of block b3.
+
+*at selection-screen output.
+*  loop at screen.
+*    if screen-group1 = 'COP'.
+*      if p_copy = 'X'.
+*        screen-active = 1.
+*      else.
+*        screen-active = 0.
+*      endif.
+*    endif.
+*    modify screen.
+*  endloop.
+
+*at selection-screen on radiobutton group r1.
 
 initialization.
   txt_b1   = 'Source program'.          "#EC NOTEXT
@@ -442,7 +466,11 @@ initialization.
   txt_code = 'Save to target program'.  "#EC NOTEXT
   txt_copy = 'Copy to package'.         "#EC NOTEXT
   txt_path = 'Target (File/Prog/Pkg)'.  "#EC NOTEXT
-  txt_rena = 'Rename'.                  "#EC NOTEXT
+
+  txt_b3   = 'Copy options'.
+  txt_rena = 'Rename'.                  "#EC NOTEXT'
+  txt_rx1  = 'Extra renames'.            "#EC NOTEXT
+  txt_rx2  = 'match (case sens.)'.               "#EC NOTEXT
 
   " TODO normal parameters show/hide and file/prog-search
 
@@ -456,6 +484,9 @@ form main.
   data lt_prog_list type zif_iasm_types=>tt_prog_names.
   data lv_1st_prog like line of lt_prog_list.
   data lx type ref to zcx_iasm_error.
+  data lt_extra_renames type zif_iasm_types=>tt_renames.
+
+  field-symbols <r> like line of lt_extra_renames.
 
   case 'X'.
     when p_disp.
@@ -479,6 +510,19 @@ form main.
     read table lt_prog_list into lv_1st_prog index 1.
   endif.
 
+  if s_renx1[] is not initial.
+    if lines( s_renx1[] ) <> lines( s_renx2[] ).
+      message 'extra renames must have same number of records' type 'E' display like 'S'.
+      return.
+    endif.
+    loop at s_renx1.
+      read table s_renx2 index sy-tabix.
+      append initial line to lt_extra_renames assigning <r>.
+      <r>-from = to_lower( s_renx1-low ).
+      <r>-to   = s_renx2-low.
+    endloop.
+  endif.
+
   try.
     if p_copy = 'X'.
       data lo_app_cloner type ref to lcl_cloner_app.
@@ -488,7 +532,8 @@ form main.
           i_classes         = lt_class_list
           i_target_pkg      = |{ p_path }|
           i_rename_from     = |{ p_ren_f }|
-          i_rename_to       = |{ p_ren_t }|.
+          i_rename_to       = |{ p_ren_t }|
+          i_extra_renames   = lt_extra_renames.
       lo_app_cloner->run( ).
     else.
       data lo_app type ref to lcl_main.

@@ -13,6 +13,7 @@ interface zif_iasm_types public.
       to type seoclasstx-clsname,
     end of ty_rename.
 
+  types tt_renames type standard table of ty_rename with key from.
   types ts_renames type sorted table of ty_rename with unique key from.
 
 endinterface.

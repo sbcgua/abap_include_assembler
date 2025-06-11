@@ -8,6 +8,7 @@ class lcl_cloner_app definition final.
         i_rename_from     type seoclasstx-clsname
         i_rename_to       type seoclasstx-clsname
         i_target_pkg      type devclass
+        i_extra_renames   type zif_iasm_types=>tt_renames
       raising
         zcx_iasm_error.
 
@@ -69,6 +70,8 @@ class lcl_cloner_app implementation.
       endif.
       insert r into table m_renames.
     endloop.
+
+    insert lines of i_extra_renames into table m_renames.
 
   endmethod.
 
