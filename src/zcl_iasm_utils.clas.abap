@@ -1,7 +1,7 @@
 class ZCL_IASM_UTILS definition
   public
   final
-  create public .
+  create public.
 
   public section.
 

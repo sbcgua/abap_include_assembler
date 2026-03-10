@@ -1,7 +1,7 @@
 class ZCL_IASM_DEVOBJ_SAVERS definition
   public
   final
-  create public .
+  create public.
 
   public section.
     class-methods to_display returning value(ri_instance) type ref to zif_iasm_devobj_saver.

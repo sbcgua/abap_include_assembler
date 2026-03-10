@@ -47,7 +47,8 @@ class lcl_main definition final.
         from type seoclasstx-clsname,
       end of ty_deps,
 
-      tt_deps type standard table of ty_deps with default key.
+      tt_deps type standard table of ty_deps with default key,
+      ts_deps type sorted table of ty_deps with unique key depends from.
 
     data:
       m_renames         type zif_iasm_types=>ts_renames,
@@ -91,6 +92,29 @@ class lcl_main definition final.
     class-methods order_classes_by_dep
       importing
         i_classes type zif_iasm_types=>ts_class_names
+      returning
+        value(r_ordered_classes) type zif_iasm_types=>tt_class_names
+      raising
+        zcx_iasm_error.
+
+    class-methods get_class_dependencies
+      importing
+        i_class type seoclasstx-clsname
+      returning
+        value(rt_env) type senvi_tab
+      raising
+        zcx_iasm_error.
+
+    class-methods check_dep_cycles
+      importing
+        i_deps    type ts_deps
+      raising
+        zcx_iasm_error.
+
+    class-methods sort_classes_by_deps
+      importing
+        i_classes type zif_iasm_types=>ts_class_names
+        i_deps    type ts_deps
       returning
         value(r_ordered_classes) type zif_iasm_types=>tt_class_names
       raising
@@ -164,49 +188,59 @@ class lcl_main implementation.
 
   endmethod.
 
+  method get_class_dependencies.
+
+    data ls_env_types type envi_types.
+    data lv_name type tadir-obj_name.
+    data lv_type type euobj-id.
+    data lo_type type ref to cl_abap_typedescr.
+
+    lv_name = i_class.
+    ls_env_types-clas = abap_true.
+*    ls_env_types-intf = abap_true. " ???
+    lo_type = cl_abap_typedescr=>describe_by_name( lv_name ).
+
+    if lo_type is not bound.
+      zcx_iasm_error=>raise( |Class/intf { lv_name } not found| ).
+    endif.
+    if lo_type->type_kind = lo_type->typekind_class.
+      lv_type = 'CLAS'.
+    elseif lo_type->type_kind = lo_type->typekind_intf.
+      lv_type = 'INTF'.
+    else.
+      zcx_iasm_error=>raise( |{ lv_name } has unexpected type kind ({ lo_type->type_kind })| ).
+    endif.
+
+    call function 'REPOSITORY_ENVIRONMENT_SET'
+      exporting
+        obj_type          = lv_type
+        object_name       = lv_name
+        environment_types = ls_env_types
+      tables
+        environment       = rt_env
+      exceptions
+        others            = 4.
+
+    " TODO check RC ?
+
+  endmethod.
+
   method order_classes_by_dep.
 
-    data lt_deps type tt_deps.
+    " TODO extract to an independent class
 
-    field-symbols <c> like line of m_classes.
-    field-symbols <dep> like line of lt_deps.
+    data lt_deps type ts_deps.
+
+    field-symbols <c> like line of i_classes.
 
     loop at i_classes assigning <c>.
 
-      data lt_env type senvi_tab.
-      data ls_env_types type envi_types.
-      data lv_name type tadir-obj_name.
-      data lv_type type euobj-id.
-      lv_name = <c>.
-      ls_env_types-clas = abap_true.
-
-      data lo_type type ref to cl_abap_typedescr.
-      lo_type = cl_abap_typedescr=>describe_by_name( lv_name ).
-      if lo_type is not bound.
-        zcx_iasm_error=>raise( |Class/intf { lv_name } not found| ).
-      endif.
-      if lo_type->type_kind = lo_type->typekind_class.
-        lv_type = 'CLAS'.
-      elseif lo_type->type_kind = lo_type->typekind_intf.
-        lv_type = 'INTF'.
-      else.
-        zcx_iasm_error=>raise( |{ lv_name } has unexpected type kind ({ lo_type->type_kind })| ).
-      endif.
-
-      call function 'REPOSITORY_ENVIRONMENT_SET'
-        exporting
-          obj_type       = lv_type
-          object_name    = lv_name
-          environment_types = ls_env_types
-        tables
-          environment    = lt_env
-        exceptions
-          others         = 4.
-
-      field-symbols <env> like line of lt_env.
       data lv_search_key type seoclasstx-clsname.
-      data lv_dep_size type i.
-      lv_dep_size = lines( lt_deps ).
+      data lt_env type senvi_tab.
+      data ls_dep like line of lt_deps.
+      field-symbols <env> like line of lt_env.
+
+      lt_env = get_class_dependencies( <c> ).
 
       loop at lt_env assigning <env>.
         check <env>-type = 'CLAS' or <env>-type = 'INTF' or <env>-type = 'OM'.
@@ -217,18 +251,13 @@ class lcl_main implementation.
         else.
           continue.
         endif.
-        read table i_classes with key table_line = lv_search_key transporting no fields. " Sorted ?
+        read table i_classes with key table_line = lv_search_key transporting no fields.
         if sy-subrc = 0.
-          append initial line to lt_deps assigning <dep>.
-          <dep>-depends = <c>.
-          <dep>-from    = lv_search_key.
+          ls_dep-depends = <c>.
+          ls_dep-from    = lv_search_key.
+          insert ls_dep into table lt_deps. " Sorted table prevents duplicates !
         endif.
       endloop.
-
-      if lines( lt_deps ) = lv_dep_size. " No dependencies
-        append initial line to lt_deps assigning <dep>.
-        <dep>-depends = <c>.
-      endif.
 
 *      data lt_tadir type if_ris_environment_types=>ty_t_senvi_tadir.
 *      cl_wb_ris_environment=>convert_senvi_to_tadir(
@@ -239,13 +268,24 @@ class lcl_main implementation.
 
     endloop.
 
+    check_dep_cycles( lt_deps ).
+
+    r_ordered_classes = sort_classes_by_deps(
+      i_classes = i_classes
+      i_deps    = lt_deps ).
+
+  endmethod.
+
+  method check_dep_cycles.
+
+    field-symbols <dep> like line of i_deps.
+
     " Protection from self cycle
-    sort lt_deps by depends from.
-    delete adjacent duplicates from lt_deps.
-    loop at lt_deps assigning <dep>.
-      read table lt_deps
+    " For now just 1 level deps
+
+    loop at i_deps assigning <dep>.
+      read table i_deps
         transporting no fields
-        binary search
         with key
           depends = <dep>-from
           from    = <dep>-depends.
@@ -254,29 +294,45 @@ class lcl_main implementation.
       endif.
     endloop.
 
+  endmethod.
+
+  method sort_classes_by_deps.
+
     data lt_unordered_classes type zif_iasm_types=>tt_class_names.
+    data lt_deps like i_deps.
     data l_index type i.
+    data l_control_count type i.
+
+    field-symbols <c> like line of lt_unordered_classes.
+
+    lt_deps = i_deps.
     lt_unordered_classes = i_classes.
 
     while lines( lt_unordered_classes ) > 0.
 
+      l_control_count = lines( lt_unordered_classes ).
+
       loop at lt_unordered_classes assigning <c>.
         l_index = sy-tabix.
         read table lt_deps
-          assigning <dep>
-          binary search
-          with key
-            depends = <c>.
-        assert sy-subrc = 0.
-        if <dep>-from is initial.
-          delete lt_deps index sy-tabix.
-          loop at lt_deps assigning <dep> where from = <c>.
-            clear <dep>-from.
-          endloop.
+          transporting no fields
+          with key depends = <c>.
+        " If no deps -> add it to the queue
+        if sy-subrc <> 0.
           append <c> to r_ordered_classes.
+          delete lt_deps where from = <c>.
           delete lt_unordered_classes index l_index.
         endif.
       endloop.
+
+      " watchdog: if nothing changed after the iteration - something is wrong - cyclic deps?
+      if l_control_count = lines( lt_unordered_classes ).
+        field-symbols <dep> like line of lt_deps.
+        loop at lt_deps assigning <dep>.
+          write: <dep>-depends, 'from', <dep>-from.
+        endloop.
+        zcx_iasm_error=>raise( |Cannot reduce dependencies further| ).
+      endif.
 
     endwhile.
 
@@ -284,13 +340,8 @@ class lcl_main implementation.
 
   method process_clas.
 
-*    data lt_unordered_classes type tt_class_names.
-*    lt_unordered_classes = m_classes.
-
     data lt_ordered_classes type zif_iasm_types=>tt_class_names.
-
     lt_ordered_classes = order_classes_by_dep( m_classes ).
-*    lt_ordered_classes = m_classes.
 
     " Serialize
 
@@ -325,6 +376,7 @@ class lcl_main implementation.
   endmethod.
 
   method list_includes.
+
     data ls_include type lcl_code_object=>ty_include.
     data l_tmp      type string.
 
@@ -334,6 +386,7 @@ class lcl_main implementation.
                'DEVC =', ls_include-obj->a_devclass.
       list_includes( ls_include-obj ).
     endloop.
+
   endmethod.
 
   method save.
